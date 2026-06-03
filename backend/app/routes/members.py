@@ -280,26 +280,20 @@ def upload_photo_public():
 @members_bp.route('/profil/<int:appele_id>/appeler', methods=['POST'])
 def track_appel(appele_id):
     """Track call initiation when user clicks call button"""
-    if 'user_id' not in session:
-        return jsonify({'error': 'Non authentifié'}), 401
+    from flask import session
     
-    appelant_id = session['user_id']
+    appelant_id = session.get('user_id') if 'user_id' in session else None
     
-    # Prevent calling oneself
-    if appelant_id == appele_id:
-        return jsonify({'error': 'Impossible de s\'appeler soi-même'}), 400
-    
-    # Check if both users exist and are active
-    appelant = Utilisateur.query.get(appelant_id)
+    # Check if called user exists and is active
     appele = Utilisateur.query.get(appele_id)
     
-    if not appelant or not appele:
+    if not appele:
         return jsonify({'error': 'Utilisateur non trouvé'}), 404
     
     if not appele.actif:
         return jsonify({'error': 'Ce compte est désactivé'}), 403
     
-    # Create call record
+    # Create call record (appelant_id can be NULL for anonymous visitors)
     appel = Appel(
         appelant_id=appelant_id,
         appele_id=appele_id

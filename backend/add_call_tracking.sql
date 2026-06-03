@@ -1,7 +1,7 @@
 -- Create table for tracking call initiations
 CREATE TABLE IF NOT EXISTS appels (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    appelant_id INT NOT NULL,
+    appelant_id INT NULL,
     appele_id INT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (appelant_id) REFERENCES utilisateurs(id) ON DELETE CASCADE,

@@ -163,7 +163,7 @@ class Appel(db.Model):
     __tablename__ = 'appels'
     
     id = db.Column(db.Integer, primary_key=True)
-    appelant_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
+    appelant_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=True)
     appele_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
