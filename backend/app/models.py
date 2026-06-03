@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
@@ -157,4 +157,23 @@ class PasswordReset(db.Model):
             'wave_count': self.wave_count,
             'is_valid': self.is_valid(),
             'is_in_cooldown': self.is_in_cooldown()
+        }
+
+class Appel(db.Model):
+    __tablename__ = 'appels'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    appelant_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
+    appele_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    appelant = db.relationship('Utilisateur', foreign_keys=[appelant_id], lazy=True)
+    appele = db.relationship('Utilisateur', foreign_keys=[appele_id], lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'appelant_id': self.appelant_id,
+            'appele_id': self.appele_id,
+            'created_at': self.created_at.isoformat()
         }

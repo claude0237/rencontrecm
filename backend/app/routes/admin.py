@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app import db
-from app.models import AlerteGlobale, Utilisateur, Region, Quartier
+from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel
 from app.utils import admin_required
 
 admin_bp = Blueprint('admin', __name__)
@@ -223,4 +223,94 @@ def get_statistiques():
         'actifs': actifs,
         'inactifs': inactifs,
         'most_active_region': most_active_region
+    }), 200
+
+# Call statistics
+@admin_bp.route('/statistiques/appels', methods=['GET'])
+def get_call_statistics():
+    total_calls = Appel.query.count()
+    
+    return jsonify({
+        'total_calls': total_calls
+    }), 200
+
+@admin_bp.route('/statistiques/appels/details', methods=['GET'])
+def get_call_statistics_details():
+    """Get detailed call statistics by user"""
+    from sqlalchemy import func
+    
+    # Get call statistics grouped by caller
+    caller_stats = db.session.query(
+        Appel.appelant_id,
+        Utilisateur.nom,
+        Utilisateur.email,
+        func.count(Appel.id).label('total_calls'),
+        func.count(func.distinct(Appel.appele_id)).label('unique_called')
+    ).join(Utilisateur, Appel.appelant_id == Utilisateur.id)\
+     .group_by(Appel.appelant_id, Utilisateur.nom, Utilisateur.email)\
+     .order_by(func.count(Appel.id).desc())\
+     .all()
+    
+    # Get call statistics grouped by called user
+    called_stats = db.session.query(
+        Appel.appele_id,
+        Utilisateur.nom,
+        Utilisateur.email,
+        func.count(Appel.id).label('total_received')
+    ).join(Utilisateur, Appel.appele_id == Utilisateur.id)\
+     .group_by(Appel.appele_id, Utilisateur.nom, Utilisateur.email)\
+     .order_by(func.count(Appel.id).desc())\
+     .all()
+    
+    return jsonify({
+        'caller_stats': [
+            {
+                'user_id': stat.appelant_id,
+                'nom': stat.nom,
+                'email': stat.email,
+                'total_calls': stat.total_calls,
+                'unique_called': stat.unique_called
+            }
+            for stat in caller_stats
+        ],
+        'called_stats': [
+            {
+                'user_id': stat.appele_id,
+                'nom': stat.nom,
+                'email': stat.email,
+                'total_received': stat.total_received
+            }
+            for stat in called_stats
+        ]
+    }), 200
+
+# Profile view statistics
+@admin_bp.route('/statistiques/visites', methods=['GET'])
+def get_visit_statistics():
+    """Get profile view statistics"""
+    total_visits = db.session.query(db.func.sum(Utilisateur.nombre_visites)).scalar() or 0
+    
+    return jsonify({
+        'total_visits': total_visits
+    }), 200
+
+@admin_bp.route('/statistiques/visites/details', methods=['GET'])
+def get_visit_statistics_details():
+    """Get detailed profile view statistics by user"""
+    visit_stats = Utilisateur.query\
+        .filter(Utilisateur.nombre_visites > 0)\
+        .order_by(Utilisateur.nombre_visites.desc())\
+        .all()
+    
+    return jsonify({
+        'visit_stats': [
+            {
+                'user_id': user.id,
+                'nom': user.nom,
+                'email': user.email,
+                'nombre_visites': user.nombre_visites,
+                'region_nom': user.region.nom if user.region else None
+            }
+            for user in visit_stats
+        ]
     }), 200

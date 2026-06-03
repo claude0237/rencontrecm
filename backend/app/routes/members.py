@@ -1,6 +1,6 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, session
 from app import db
-from app.models import Region, Quartier, Utilisateur
+from app.models import Region, Quartier, Utilisateur, Appel
 import json
 import os
 import math
@@ -276,3 +276,39 @@ def upload_photo_public():
     print(f"Photo URL: {photo_url}")
     
     return jsonify({'photo_url': photo_url}), 200
+
+@members_bp.route('/profil/<int:appele_id>/appeler', methods=['POST'])
+def track_appel(appele_id):
+    """Track call initiation when user clicks call button"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    appelant_id = session['user_id']
+    
+    # Prevent calling oneself
+    if appelant_id == appele_id:
+        return jsonify({'error': 'Impossible de s\'appeler soi-même'}), 400
+    
+    # Check if both users exist and are active
+    appelant = Utilisateur.query.get(appelant_id)
+    appele = Utilisateur.query.get(appele_id)
+    
+    if not appelant or not appele:
+        return jsonify({'error': 'Utilisateur non trouvé'}), 404
+    
+    if not appele.actif:
+        return jsonify({'error': 'Ce compte est désactivé'}), 403
+    
+    # Create call record
+    appel = Appel(
+        appelant_id=appelant_id,
+        appele_id=appele_id
+    )
+    db.session.add(appel)
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Appel enregistré',
+        'appel': appel.to_dict(),
+        'appele_phone': appele.contact_direct
+    }), 200

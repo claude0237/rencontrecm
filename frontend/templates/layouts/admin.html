@@ -103,6 +103,16 @@
                         class="w-full text-left px-4 py-3 rounded-lg transition">
                         🔒 Comptes Désactivés
                     </button>
+                    <button @click="activeSection = 'statistiques-appels'" 
+                        :class="activeSection === 'statistiques-appels' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        📞 Statistiques Appels
+                    </button>
+                    <button @click="activeSection = 'statistiques-visites'" 
+                        :class="activeSection === 'statistiques-visites' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        👁️ Statistiques Visites
+                    </button>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -156,6 +166,16 @@
                         class="w-full text-left px-4 py-3 rounded-lg transition">
                         🔒 Comptes Désactivés
                     </button>
+                    <button @click="activeSection = 'statistiques-appels'; sidebarOpen = false" 
+                        :class="activeSection === 'statistiques-appels' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        📞 Statistiques Appels
+                    </button>
+                    <button @click="activeSection = 'statistiques-visites'; sidebarOpen = false" 
+                        :class="activeSection === 'statistiques-visites' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        👁️ Statistiques Visites
+                    </button>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -188,6 +208,16 @@
             <!-- Comptes Désactivés Section -->
             <div x-show="activeSection === 'comptes-desactives'" x-transition>
                 {% include 'admin/comptes_desactives.html' %}
+            </div>
+            
+            <!-- Statistiques Appels Section -->
+            <div x-show="activeSection === 'statistiques-appels'" x-transition>
+                {% include 'admin/statistiques_appels.html' %}
+            </div>
+            
+            <!-- Statistiques Visites Section -->
+            <div x-show="activeSection === 'statistiques-visites'" x-transition>
+                {% include 'admin/statistiques_visites.html' %}
             </div>
         </main>
     </div>

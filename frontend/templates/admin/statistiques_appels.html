@@ -1,0 +1,97 @@
+<h1 class="text-4xl font-bold text-rose mb-8">Statistiques des Appels</h1>
+
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6" x-data="{ 
+    callerStats: [], 
+    calledStats: [],
+    loading: true,
+    init() {
+        this.loadStatistics();
+    },
+    loadStatistics() {
+        this.loading = true;
+        
+        fetch('/api/v1/admin/statistiques/appels/details')
+            .then(r => r.json())
+            .then(data => {
+                this.callerStats = data.caller_stats;
+                this.calledStats = data.called_stats;
+                this.loading = false;
+            })
+            .catch(err => {
+                console.error('Error loading call statistics:', err);
+                this.loading = false;
+            });
+    }
+}" x-init="init()">
+    <div class="mb-4">
+        <button @click="loadStatistics()" :disabled="loading"
+            class="bg-rose text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-dark transition disabled:opacity-50">
+            <span x-show="!loading">🔄 Rafraîchir</span>
+            <span x-show="loading">Chargement...</span>
+        </button>
+    </div>
+    
+    <div x-show="loading" class="text-center py-8 text-gray-500">
+        Chargement...
+    </div>
+    
+    <div x-show="!loading">
+        <h2 class="text-2xl font-bold text-charcoal mb-4">📞 Utilisateurs qui ont appelé</h2>
+        <div class="overflow-x-auto mb-8">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-3 px-4">Nom</th>
+                        <th class="text-left py-3 px-4">Email</th>
+                        <th class="text-left py-3 px-4">Total appels</th>
+                        <th class="text-left py-3 px-4">Personnes appelées (uniques)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="stat in callerStats" :key="stat.user_id">
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-3 px-4" x-text="stat.nom"></td>
+                            <td class="py-3 px-4" x-text="stat.email"></td>
+                            <td class="py-3 px-4">
+                                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold" x-text="stat.total_calls"></span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold" x-text="stat.unique_called"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+            <div x-show="callerStats.length === 0" class="text-center py-8 text-gray-500">
+                Aucun appel enregistré
+            </div>
+        </div>
+        
+        <h2 class="text-2xl font-bold text-charcoal mb-4">📱 Utilisateurs qui ont été appelés</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-3 px-4">Nom</th>
+                        <th class="text-left py-3 px-4">Email</th>
+                        <th class="text-left py-3 px-4">Total reçus</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="stat in calledStats" :key="stat.user_id">
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-3 px-4" x-text="stat.nom"></td>
+                            <td class="py-3 px-4" x-text="stat.email"></td>
+                            <td class="py-3 px-4">
+                                <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-semibold" x-text="stat.total_received"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+            <div x-show="calledStats.length === 0" class="text-center py-8 text-gray-500">
+                Aucun appel reçu
+            </div>
+        </div>
+    </div>
+</div>

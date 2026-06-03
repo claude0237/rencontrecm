@@ -1,0 +1,66 @@
+<h1 class="text-4xl font-bold text-rose mb-8">Statistiques des Consultations de Profils</h1>
+
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6" x-data="{ 
+    visitStats: [],
+    loading: true,
+    init() {
+        this.loadStatistics();
+    },
+    loadStatistics() {
+        this.loading = true;
+        
+        fetch('/api/v1/admin/statistiques/visites/details')
+            .then(r => r.json())
+            .then(data => {
+                this.visitStats = data.visit_stats;
+                this.loading = false;
+            })
+            .catch(err => {
+                console.error('Error loading visit statistics:', err);
+                this.loading = false;
+            });
+    }
+}" x-init="init()">
+    <div class="mb-4">
+        <button @click="loadStatistics()" :disabled="loading"
+            class="bg-rose text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-dark transition disabled:opacity-50">
+            <span x-show="!loading">🔄 Rafraîchir</span>
+            <span x-show="loading">Chargement...</span>
+        </button>
+    </div>
+    
+    <div x-show="loading" class="text-center py-8 text-gray-500">
+        Chargement...
+    </div>
+    
+    <div x-show="!loading">
+        <h2 class="text-2xl font-bold text-charcoal mb-4">👁️ Profils les plus consultés</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-3 px-4">Nom</th>
+                        <th class="text-left py-3 px-4">Email</th>
+                        <th class="text-left py-3 px-4">Région</th>
+                        <th class="text-left py-3 px-4">Nombre de visites</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="stat in visitStats" :key="stat.user_id">
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-3 px-4" x-text="stat.nom"></td>
+                            <td class="py-3 px-4" x-text="stat.email"></td>
+                            <td class="py-3 px-4" x-text="stat.region_nom || '-'"></td>
+                            <td class="py-3 px-4">
+                                <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-semibold" x-text="stat.nombre_visites"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+            <div x-show="visitStats.length === 0" class="text-center py-8 text-gray-500">
+                Aucune visite enregistrée
+            </div>
+        </div>
+    </div>
+</div>
