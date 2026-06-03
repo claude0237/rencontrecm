@@ -14,7 +14,6 @@
         genre: '',
         region_id: '',
         quartier_id: '',
-        description: '',
         photos: [],
         contact_whatsapp: '',
         contact_direct: '',
@@ -26,12 +25,31 @@
         loading: false,
         uploading: false,
         error: '',
+        telephoneError: '',
+        photoError: '',
         init() {
             fetch('/api/v1/regions')
                 .then(r => r.json())
                 .then(data => this.regions = data.regions);
             this.getGeolocation();
             this.getEquipment();
+        },
+        validateTelephone() {
+            const phone = this.contact_direct.trim();
+            if (!phone) {
+                this.telephoneError = 'Numéro de téléphone obligatoire';
+                return false;
+            }
+            
+            // Format Cameroun: +237XXXXXXXXX ou format national (9 chiffres commençant par 6)
+            const cameroonPattern = /^(\+237)?[6][0-9]{8}$/;
+            if (!cameroonPattern.test(phone.replace(/\s/g, ''))) {
+                this.telephoneError = 'Format invalide. Utilisez +237XXXXXXXXX ou XXXXXXXXX (9 chiffres commençant par 6)';
+                return false;
+            }
+            
+            this.telephoneError = '';
+            return true;
         },
         loadQuartiers() {
             if (this.region_id) {
@@ -102,31 +120,31 @@
     }" @submit.prevent="register" x-init="init()">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="mb-4">
-                <label class="block text-charcoal font-semibold mb-2">Email</label>
+                <label class="block text-charcoal font-semibold mb-2">Email *</label>
                 <input type="email" x-model="email" required
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
             </div>
             
             <div class="mb-4">
-                <label class="block text-charcoal font-semibold mb-2">Mot de passe</label>
+                <label class="block text-charcoal font-semibold mb-2">Mot de passe *</label>
                 <input type="password" x-model="password" required
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
             </div>
             
             <div class="mb-4">
-                <label class="block text-charcoal font-semibold mb-2">Nom</label>
+                <label class="block text-charcoal font-semibold mb-2">Nom *</label>
                 <input type="text" x-model="nom" required
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
             </div>
             
             <div class="mb-4">
-                <label class="block text-charcoal font-semibold mb-2">Âge</label>
+                <label class="block text-charcoal font-semibold mb-2">Âge *</label>
                 <input type="number" x-model="age" required min="18"
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
             </div>
             
             <div class="mb-4">
-                <label class="block text-charcoal font-semibold mb-2">Genre</label>
+                <label class="block text-charcoal font-semibold mb-2">Genre *</label>
                 <select x-model="genre" required
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
                     <option value="">Sélectionner</option>
@@ -136,7 +154,7 @@
             </div>
             
             <div class="mb-4">
-                <label class="block text-charcoal font-semibold mb-2">Ville</label>
+                <label class="block text-charcoal font-semibold mb-2">Ville *</label>
                 <select x-model="region_id" @change="loadQuartiers()" required
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
                     <option value="">Sélectionner</option>
@@ -147,7 +165,7 @@
             </div>
             
             <div class="mb-4">
-                <label class="block text-charcoal font-semibold mb-2">Commune/Arrondissement</label>
+                <label class="block text-charcoal font-semibold mb-2">Commune/Arrondissement *</label>
                 <select x-model="quartier_id" :disabled="!region_id" required
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose disabled:opacity-50">
                     <option value="">Sélectionner d'abord une ville</option>
@@ -164,22 +182,25 @@
             </div>
             
             <div class="mb-4 md:col-span-2">
-                <label class="block text-charcoal font-semibold mb-2">Photo de profil</label>
+                <label class="block text-charcoal font-semibold mb-2">Photo de profil *</label>
                 <input type="file" @change="uploadPhoto" accept="image/*"
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
                 <div x-show="uploading" class="text-gray-500 text-sm mt-1">Upload en cours...</div>
                 <div x-show="photos.length > 0" class="text-green-600 text-sm mt-1">Photo téléchargée avec succès</div>
+                <div x-show="photoError" x-text="photoError" class="text-rose text-sm mt-1"></div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-charcoal font-semibold mb-2">Téléphone *</label>
+                <input type="tel" x-model="contact_direct" @blur="validateTelephone()" required
+                    placeholder="+237XXXXXXXXX ou XXXXXXXXX"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                <div x-show="telephoneError" x-text="telephoneError" class="text-rose text-sm mt-1"></div>
             </div>
             
             <div class="mb-4">
                 <label class="block text-charcoal font-semibold mb-2">WhatsApp (optionnel)</label>
                 <input type="text" x-model="contact_whatsapp"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
-            </div>
-            
-            <div class="mb-4 md:col-span-2">
-                <label class="block text-charcoal font-semibold mb-2">Contact direct (optionnel)</label>
-                <input type="text" x-model="contact_direct"
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
             </div>
         </div>
@@ -204,6 +225,21 @@
 function register(event) {
     this.loading = true;
     this.error = '';
+    this.telephoneError = '';
+    this.photoError = '';
+    
+    // Valider le téléphone
+    if (!this.validateTelephone()) {
+        this.loading = false;
+        return;
+    }
+    
+    // Valider qu'au moins une photo est uploadée
+    if (!this.photos || this.photos.length === 0) {
+        this.photoError = 'Au moins une photo est requise';
+        this.loading = false;
+        return;
+    }
     
     const payload = {
         email: this.email,
@@ -211,12 +247,11 @@ function register(event) {
         nom: this.nom,
         age: parseInt(this.age),
         genre: this.genre,
+        contact_direct: this.contact_direct.trim(),
         region_id: parseInt(this.region_id),
         quartier_id: parseInt(this.quartier_id),
-        description: this.description,
         photos: this.photos,
         contact_whatsapp: this.contact_whatsapp,
-        contact_direct: this.contact_direct,
         equipement: this.equipement
     };
     

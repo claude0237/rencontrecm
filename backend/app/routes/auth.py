@@ -10,22 +10,42 @@ auth_bp = Blueprint('auth', __name__)
 def register():
     data = request.get_json()
     
-    if not data or not all(k in data for k in ['email', 'password', 'nom', 'age', 'genre', 'region_id', 'quartier_id']):
-        return jsonify({'error': 'Données incomplètes'}), 400
+    # Validation des champs obligatoires
+    required_fields = ['email', 'password', 'nom', 'age', 'genre', 'contact_direct', 'region_id', 'quartier_id']
+    if not data or not all(k in data for k in required_fields):
+        return jsonify({'error': 'Veuillez compléter votre profil. Tous les champs marqués d\'un * sont obligatoires.'}), 400
+    
+    # Validation du téléphone (contact_direct)
+    contact_direct = data.get('contact_direct', '').strip()
+    if not contact_direct:
+        return jsonify({'error': 'Numéro de téléphone obligatoire'}), 400
+    
+    # Format Cameroun: +237XXXXXXXXX ou format national (9 chiffres commençant par 6)
+    import re
+    cameroon_pattern = re.compile(r'^(\+237)?[6][0-9]{8}$')
+    if not cameroon_pattern.match(contact_direct.replace(' ', '')):
+        return jsonify({'error': 'Format de téléphone invalide. Utilisez +237XXXXXXXXX ou XXXXXXXXX (9 chiffres commençant par 6)'}), 400
+    
+    # Validation des photos (minimum 1 photo requise)
+    if not data.get('photos') or len(data.get('photos', [])) == 0:
+        return jsonify({'error': 'Au moins une photo est requise'}), 400
     
     if Utilisateur.query.filter_by(email=data['email']).first():
         return jsonify({'error': 'Email déjà utilisé'}), 400
+    
+    if Utilisateur.query.filter_by(contact_direct=contact_direct).first():
+        return jsonify({'error': 'Numéro de téléphone déjà utilisé'}), 400
     
     user = Utilisateur(
         email=data['email'],
         nom=data['nom'],
         age=data['age'],
         genre=data['genre'],
+        contact_direct=contact_direct,
         region_id=data['region_id'],
         quartier_id=data['quartier_id'],
         description=data.get('description', ''),
         contact_whatsapp=data.get('contact_whatsapp', ''),
-        contact_direct=data.get('contact_direct', ''),
         latitude=data.get('latitude'),
         longitude=data.get('longitude'),
         equipement=data.get('equipement', '')

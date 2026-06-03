@@ -46,7 +46,7 @@ class Utilisateur(db.Model):
     photos = db.Column(db.Text)  # JSON array of photo URLs
     photo_principale = db.Column(db.Integer, default=0)  # Index of the main photo in photos array
     contact_whatsapp = db.Column(db.String(50))
-    contact_direct = db.Column(db.String(50))
+    contact_direct = db.Column(db.String(50), nullable=False, unique=True)  # Numéro de téléphone principal
     actif = db.Column(db.Boolean, default=True)
     est_admin = db.Column(db.Boolean, default=False)
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
