@@ -77,6 +77,17 @@ Cela va :
 - Ajouter au moins 5 communes/arrondissements pour Douala et Yaoundé
 - Créer un compte admin : admin@rencontres.cm / Cm2026!Admin
 
+7. Exécuter les scripts de migration pour les fonctionnalités de sécurité :
+```bash
+mysql -u root -p rencontres_cm < backend/add_password_resets_table.sql
+mysql -u root -p rencontres_cm < backend/add_security_fields.sql
+```
+
+Ces scripts ajoutent :
+- La table `password_resets` pour la gestion des codes de réinitialisation
+- Les champs de sécurité `wave_count`, `last_attempt_at` pour le suivi des tentatives
+- Les champs `disabled_reason`, `disabled_at` pour le suivi des comptes désactivés
+
 ## Lancement
 
 Lancer l'application en développement :
@@ -189,6 +200,12 @@ sudo systemctl restart nginx
 ### Backend (API REST)
 
 - **Authentification** : Login/Register avec sessions, gestion de la dernière connexion
+- **Réinitialisation de mot de passe** : 
+  - Code à 6 chiffres envoyé par email/SMS
+  - Expiration après 15 minutes
+  - Maximum 3 tentatives par code
+  - Cooldown de 30 minutes après 3 tentatives échouées
+  - Désactivation automatique après 3 vagues de tentatives échouées
 - **Profils** : CRUD complet, photos multiples, photo principale, compteur de visites
 - **Géolocalisation** : Calcul de distance entre utilisateurs, tracking de position
 - **Régions et Communes** : API pour les villes et quartiers du Cameroun
@@ -199,6 +216,7 @@ sudo systemctl restart nginx
   - Gestion des utilisateurs (promotion admin, désactivation)
   - Configuration géographique (CRUD régions/quartiers)
   - Gestion des alertes globales (bannière défilante)
+  - Gestion des comptes désactivés (réactivation, affichage des raisons)
 
 ### Frontend
 
@@ -241,6 +259,7 @@ sudo systemctl restart nginx
 - **region** : Régions du Cameroun
 - **quartier** : Communes/arrondissements
 - **alerte_globale** : Alertes pour la bannière
+- **password_resets** : Codes de réinitialisation de mot de passe
 
 ### Colonnes utilisateur
 - Informations de base (nom, email, mot de passe, âge, genre)
@@ -249,6 +268,7 @@ sudo systemctl restart nginx
 - Statistiques (nombre_visites, derniere_connexion, en_ligne)
 - Contact (contact_whatsapp, contact_direct)
 - Admin (est_admin, actif)
+- Sécurité (disabled_reason, disabled_at)
 
 ## Sécurité
 
@@ -257,6 +277,12 @@ sudo systemctl restart nginx
 - Protection CSRF
 - Validation des entrées
 - Gestion des rôles admin
+- **Sécurité du reset de mot de passe** :
+  - Code à 6 chiffres avec expiration de 15 minutes
+  - Maximum 3 tentatives par code
+  - Cooldown de 30 minutes après 3 tentatives échouées
+  - Désactivation automatique après 3 vagues de tentatives échouées
+  - Suivi des vagues de tentatives dans la base de données
 
 ## Licence
 
