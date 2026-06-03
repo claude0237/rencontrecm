@@ -48,6 +48,8 @@ class Utilisateur(db.Model):
     contact_whatsapp = db.Column(db.String(50))
     contact_direct = db.Column(db.String(50), nullable=False, unique=True)  # Numéro de téléphone principal
     actif = db.Column(db.Boolean, default=True)
+    disabled_reason = db.Column(db.String(100), nullable=True)  # Raison de désactivation
+    disabled_at = db.Column(db.DateTime, nullable=True)  # Date de désactivation
     est_admin = db.Column(db.Boolean, default=False)
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
     derniere_connexion = db.Column(db.DateTime)
@@ -91,6 +93,8 @@ class Utilisateur(db.Model):
             'contact_whatsapp': self.contact_whatsapp,
             'contact_direct': self.contact_direct,
             'actif': self.actif,
+            'disabled_reason': self.disabled_reason,
+            'disabled_at': self.disabled_at.isoformat() if self.disabled_at else None,
             'est_admin': self.est_admin,
             'derniere_connexion': self.derniere_connexion.isoformat() if self.derniere_connexion else None,
             'en_ligne': 'Oui' if self.en_ligne else 'Non',
@@ -124,6 +128,8 @@ class PasswordReset(db.Model):
     telephone = db.Column(db.String(20), nullable=True)
     code = db.Column(db.String(6), nullable=False)
     attempts = db.Column(db.Integer, default=0)
+    wave_count = db.Column(db.Integer, default=0)  # Number of failed reset waves
+    last_attempt_at = db.Column(db.DateTime, nullable=True)  # Last failed attempt time
     expires_at = db.Column(db.DateTime, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     used = db.Column(db.Boolean, default=False)
@@ -134,6 +140,13 @@ class PasswordReset(db.Model):
     def is_valid(self):
         return not self.used and not self.is_expired() and self.attempts < 3
     
+    def is_in_cooldown(self):
+        """Check if user is in 30-minute cooldown after failed attempts"""
+        if not self.last_attempt_at or self.wave_count == 0:
+            return False
+        cooldown_end = self.last_attempt_at + timedelta(minutes=30)
+        return datetime.utcnow() < cooldown_end
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -141,5 +154,7 @@ class PasswordReset(db.Model):
             'telephone': self.telephone,
             'expires_at': self.expires_at.isoformat(),
             'attempts': self.attempts,
-            'is_valid': self.is_valid()
+            'wave_count': self.wave_count,
+            'is_valid': self.is_valid(),
+            'is_in_cooldown': self.is_in_cooldown()
         }

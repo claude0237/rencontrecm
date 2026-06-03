@@ -98,6 +98,11 @@
                         class="w-full text-left px-4 py-3 rounded-lg transition">
                         📢 Alertes
                     </button>
+                    <button @click="activeSection = 'comptes-desactives'" 
+                        :class="activeSection === 'comptes-desactives' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        🔒 Comptes Désactivés
+                    </button>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -146,6 +151,11 @@
                         class="w-full text-left px-4 py-3 rounded-lg transition">
                         📢 Alertes
                     </button>
+                    <button @click="activeSection = 'comptes-desactives'; sidebarOpen = false" 
+                        :class="activeSection === 'comptes-desactives' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        🔒 Comptes Désactivés
+                    </button>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -173,6 +183,11 @@
             <!-- Alertes Section -->
             <div x-show="activeSection === 'alertes'" x-transition>
                 {% include 'admin/sections/alertes.html' %}
+            </div>
+            
+            <!-- Comptes Désactivés Section -->
+            <div x-show="activeSection === 'comptes-desactives'" x-transition>
+                {% include 'admin/comptes_desactives.html' %}
             </div>
         </main>
     </div>

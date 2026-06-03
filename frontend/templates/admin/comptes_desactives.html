@@ -1,0 +1,102 @@
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <h1 class="text-4xl font-bold text-rose mb-8">Comptes Désactivés (Reset)</h1>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6" x-data="{ 
+        utilisateurs: [], 
+        loading: false,
+        init() {
+            this.loadDisabledAccounts();
+        },
+        loadDisabledAccounts() {
+            this.loading = true;
+            
+            fetch('/api/v1/auth/admin/disabled-accounts')
+                .then(r => r.json())
+                .then(data => {
+                    this.utilisateurs = data.accounts;
+                    this.loading = false;
+                })
+                .catch(err => {
+                    console.error('Error loading disabled accounts:', err);
+                    this.loading = false;
+                });
+        },
+        getDisabledReasonText(reason) {
+            const reasons = {
+                'excessive_reset_attempts': 'Tentatives reset excessives',
+                'manual': 'Désactivation manuelle'
+            };
+            return reasons[reason] || reason;
+        },
+        reactivateAccount(user) {
+            if (!confirm(`Voulez-vous vraiment réactiver le compte de ${user.email}?`)) return;
+            
+            fetch(`/api/v1/auth/admin/reactivate-account/${user.id}`, {
+                method: 'POST'
+            })
+            .then(r => r.json())
+            .then(data => {
+                this.utilisateurs = this.utilisateurs.filter(u => u.id !== user.id);
+                alert('Compte réactivé avec succès');
+            })
+            .catch(err => {
+                console.error('Error reactivating account:', err);
+                alert('Erreur lors de la réactivation');
+            });
+        }
+    }" x-init="init()">
+        <div class="mb-4">
+            <button @click="loadDisabledAccounts()" :disabled="loading"
+                class="bg-rose text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-dark transition disabled:opacity-50">
+                <span x-show="!loading">🔄 Rafraîchir</span>
+                <span x-show="loading">Chargement...</span>
+            </button>
+        </div>
+        
+        <!-- Users Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-3 px-4">Email</th>
+                        <th class="text-left py-3 px-4">Nom</th>
+                        <th class="text-left py-3 px-4">Genre</th>
+                        <th class="text-left py-3 px-4">Ville</th>
+                        <th class="text-left py-3 px-4">Raison</th>
+                        <th class="text-left py-3 px-4">Désactivé le</th>
+                        <th class="text-left py-3 px-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="user in utilisateurs" :key="user.id">
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-3 px-4" x-text="user.email"></td>
+                            <td class="py-3 px-4" x-text="user.nom"></td>
+                            <td class="py-3 px-4" x-text="user.genre"></td>
+                            <td class="py-3 px-4" x-text="user.region_nom"></td>
+                            <td class="py-3 px-4">
+                                <span x-show="user.disabled_reason" x-text="getDisabledReasonText(user.disabled_reason)" 
+                                    class="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-semibold"></span>
+                            </td>
+                            <td class="py-3 px-4" x-text="user.disabled_at ? new Date(user.disabled_at).toLocaleString('fr-FR') : '-'"></td>
+                            <td class="py-3 px-4">
+                                <button @click="reactivateAccount(user)"
+                                    class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">
+                                    Réactiver
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+        
+        <div x-show="utilisateurs.length === 0" class="text-center py-8 text-gray-500">
+            Aucun compte désactivé
+        </div>
+        
+        <div x-show="loading" class="text-center py-8 text-gray-500">
+            Chargement...
+        </div>
+    </div>
+</div>

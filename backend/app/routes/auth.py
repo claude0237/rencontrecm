@@ -200,21 +200,42 @@ def verify_reset_code():
     if not user:
         return jsonify({'error': 'Utilisateur non trouvé'}), 404
     
+    # Check if account is disabled
+    if not user.actif and user.disabled_reason == 'excessive_reset_attempts':
+        return jsonify({'error': 'Compte désactivé suite à trop de tentatives de réinitialisation. Contactez l\'administrateur.'}), 403
+    
     # Find valid reset code
     reset = PasswordReset.query.filter_by(
         email=user.email,
-        code=code,
         used=False
     ).order_by(PasswordReset.created_at.desc()).first()
     
     if not reset:
-        return jsonify({'error': 'Code invalide'}), 400
+        return jsonify({'error': 'Aucune demande de réinitialisation en cours'}), 400
+    
+    # Check cooldown
+    if reset.is_in_cooldown():
+        remaining_minutes = int((reset.last_attempt_at + timedelta(minutes=30) - datetime.utcnow()).total_seconds() / 60)
+        return jsonify({'error': f'Veuillez attendre {remaining_minutes} minutes avant une nouvelle tentative'}), 429
     
     if reset.is_expired():
         return jsonify({'error': 'Code expiré'}), 400
     
     if reset.attempts >= 3:
-        return jsonify({'error': 'Trop de tentatives. Veuillez demander un nouveau code.'}), 400
+        # Increment wave count and set cooldown
+        reset.wave_count += 1
+        reset.last_attempt_at = datetime.utcnow()
+        
+        # Disable account after 3 waves
+        if reset.wave_count >= 3:
+            user.actif = False
+            user.disabled_reason = 'excessive_reset_attempts'
+            user.disabled_at = datetime.utcnow()
+            db.session.commit()
+            return jsonify({'error': 'Compte désactivé suite à trop de tentatives de réinitialisation. Contactez l\'administrateur.'}), 403
+        
+        db.session.commit()
+        return jsonify({'error': 'Trop de tentatives. Veuillez attendre 30 minutes avant une nouvelle demande.'}), 429
     
     # Increment attempts
     reset.attempts += 1
@@ -223,6 +244,9 @@ def verify_reset_code():
     if reset.code == code:
         return jsonify({'message': 'Code validé avec succès', 'email': user.email}), 200
     else:
+        # Update last attempt time on incorrect code
+        reset.last_attempt_at = datetime.utcnow()
+        db.session.commit()
         return jsonify({'error': 'Code incorrect'}), 400
 
 @auth_bp.route('/password-reset/reset', methods=['POST'])
@@ -263,3 +287,49 @@ def reset_password():
     NotificationService.send_password_reset_confirmation(user)
     
     return jsonify({'message': 'Mot de passe réinitialisé avec succès'}), 200
+
+@auth_bp.route('/admin/disabled-accounts', methods=['GET'])
+def get_disabled_accounts():
+    """Get list of disabled accounts (admin only)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    current_user = Utilisateur.query.get(session['user_id'])
+    if not current_user or not current_user.est_admin:
+        return jsonify({'error': 'Accès non autorisé'}), 403
+    
+    # Get accounts disabled by excessive reset attempts
+    disabled_accounts = Utilisateur.query.filter_by(
+        actif=False,
+        disabled_reason='excessive_reset_attempts'
+    ).all()
+    
+    return jsonify({
+        'accounts': [user.to_dict() for user in disabled_accounts],
+        'count': len(disabled_accounts)
+    }), 200
+
+@auth_bp.route('/admin/reactivate-account/<int:user_id>', methods=['POST'])
+def reactivate_account(user_id):
+    """Reactivate a disabled account (admin only)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    current_user = Utilisateur.query.get(session['user_id'])
+    if not current_user or not current_user.est_admin:
+        return jsonify({'error': 'Accès non autorisé'}), 403
+    
+    user = Utilisateur.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'Utilisateur non trouvé'}), 404
+    
+    user.actif = True
+    user.disabled_reason = None
+    user.disabled_at = None
+    
+    # Reset password reset attempts
+    PasswordReset.query.filter_by(email=user.email).update({'used': True})
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Compte réactivé avec succès'}), 200
