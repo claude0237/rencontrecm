@@ -15,24 +15,57 @@ Application de rencontre camerounaise avec architecture modulaire et découplée
 │   │   │   ├── members.py     # API Profils, Villes et Communes
 │   │   │   └── admin.py       # API de gestion (AlerteGlobale, Modération)
 │   │   └── utils/             # Décorateur @admin_required
-│   ├── config.py              # Configuration Flask (SQLite, Secret Key)
+│   ├── config.py              # Configuration Flask (MySQL, Secret Key)
 │   └── run.py                 # Commandes CLI & Lancement
 └── frontend/
     ├── static/                # CSS/JS
     └── templates/
         ├── layouts/           # base.html (Tailwind + Alpine.js)
         ├── auth/              # login.html, register.html
-        └── main/              # index.html (Filtres asynchrones), profil.html
+        ├── main/              # index.html (Filtres asynchrones), profil.html
+        └── admin/             # dashboard.html, utilisateurs.html, geographie.html, alertes.html
 ```
+
+## Prérequis
+
+- Python 3.11 ou 3.12
+- MySQL 8.0+
+- pip (gestionnaire de paquets Python)
 
 ## Installation
 
-1. Installer les dépendances Python :
+1. Cloner le dépôt :
+```bash
+git clone https://github.com/claude0237/rencontrecm.git
+cd rencontrecm
+```
+
+2. Créer un environnement virtuel :
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
+```
+
+3. Installer les dépendances Python :
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Initialiser la base de données :
+4. Configurer la base de données MySQL :
+```bash
+# Créer la base de données
+mysql -u root -p
+CREATE DATABASE rencontres_cm;
+EXIT;
+```
+
+5. Configurer la connexion MySQL dans `backend/config.py` :
+```python
+SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://votre_user:votre_password@localhost/rencontres_cm'
+```
+
+6. Initialiser la base de données :
 ```bash
 cd backend
 python run.py init-db
@@ -46,7 +79,7 @@ Cela va :
 
 ## Lancement
 
-Lancer l'application :
+Lancer l'application en développement :
 ```bash
 cd backend
 python run.py
@@ -54,22 +87,140 @@ python run.py
 
 L'application sera accessible sur http://localhost:5000
 
+## Déploiement en Production (VPS Linux)
+
+### Prérequis serveur
+```bash
+sudo apt update
+sudo apt install python3.11 python3.11-venv python3-pip mysql-server nginx
+```
+
+### Configuration MySQL
+```bash
+sudo mysql_secure_installation
+sudo mysql -u root -p
+CREATE DATABASE rencontres_cm;
+CREATE USER 'rencontres_user'@'localhost' IDENTIFIED BY 'mot_de_passe_secure';
+GRANT ALL PRIVILEGES ON rencontres_cm.* TO 'rencontres_user'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+### Déploiement de l'application
+```bash
+# Cloner le dépôt
+git clone https://github.com/claude0237/rencontrecm.git
+cd rencontrecm
+
+# Créer l'environnement virtuel
+python3.11 -m venv .venv
+source .venv/bin/activate
+
+# Installer les dépendances
+pip install -r requirements.txt
+pip install gunicorn
+
+# Configurer la base de données
+nano backend/config.py  # Modifier SQLALCHEMY_DATABASE_URI
+
+# Initialiser la base de données
+cd backend
+python run.py init-db
+```
+
+### Configuration Gunicorn + Nginx
+```bash
+# Créer un service systemd
+sudo nano /etc/systemd/system/rencontrecm.service
+```
+
+Contenu du service :
+```ini
+[Unit]
+Description=RencontresCM Gunicorn Application
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/path/to/rencontrecm
+Environment="PATH=/path/to/rencontrecm/.venv/bin"
+ExecStart=/path/to/rencontrecm/.venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 "run:create_app()"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# Démarrer le service
+sudo systemctl start rencontrecm
+sudo systemctl enable rencontrercm
+
+# Configurer Nginx
+sudo nano /etc/nginx/sites-available/rencontrecm
+```
+
+Configuration Nginx :
+```nginx
+server {
+    listen 80;
+    server_name votre-domaine.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /static {
+        alias /path/to/rencontrecm/frontend/static;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/rencontrecm /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
 ## Fonctionnalités
 
 ### Backend (API REST)
 
-- **Authentification** : Login/Register avec sessions
-- **Profils** : CRUD pour les profils utilisateurs
-- **Régions et Communes** : API pour les villes et quartiers
-- **Admin** : Gestion des alertes globales et modération
+- **Authentification** : Login/Register avec sessions, gestion de la dernière connexion
+- **Profils** : CRUD complet, photos multiples, photo principale, compteur de visites
+- **Géolocalisation** : Calcul de distance entre utilisateurs, tracking de position
+- **Régions et Communes** : API pour les villes et quartiers du Cameroun
+- **Profils recommandés** : Algorithme basé sur le genre, les visites et la distance
+- **Pagination** : Support de pagination pour les listes de profils
+- **Admin** : 
+  - Tableau de bord avec statistiques (utilisateurs totaux, actifs/inactifs)
+  - Gestion des utilisateurs (promotion admin, désactivation)
+  - Configuration géographique (CRUD régions/quartiers)
+  - Gestion des alertes globales (bannière défilante)
 
 ### Frontend
 
 - **Design Luxury** : Couleurs Rose (#e8536a), Crème (#fdf6f0), Charcoal (#1c1c2e)
-- **Tailwind CSS** : Styling moderne
+- **Tailwind CSS** : Styling moderne et responsive
 - **Alpine.js** : Interactivité côté client
 - **Filtres asynchrones** : Filtrage des profils sans rechargement
 - **Communes dynamiques** : Mise à jour automatique des communes selon la ville sélectionnée
+- **Pagination** : Navigation par pages sur l'accueil et les profils similaires
+- **Profils cliquables** : Navigation directe en cliquant sur les cartes
+- **Alertes défilantes** : Bannière d'alertes avec animation marquee
+- **Responsive mobile** : Menu hamburger, layout adapté
+
+### Fonctionnalités Utilisateur
+
+- Inscription avec photo
+- Édition de profil (informations, photos, photo principale)
+- Géolocalisation automatique
+- Affichage de distance entre utilisateurs
+- Compteur de visites de profil
+- Statut en ligne
+- Recherche par ville, genre, âge
 
 ## Compte Admin
 
@@ -78,6 +229,35 @@ L'application sera accessible sur http://localhost:5000
 
 ## Technologies
 
-- Backend : Flask, SQLAlchemy, Flask-CORS
-- Frontend : Tailwind CSS, Alpine.js
-- Base de données : SQLite
+- **Backend** : Flask 3.0.0, SQLAlchemy 3.1.1, Flask-CORS 4.0.0
+- **Frontend** : Tailwind CSS, Alpine.js 3.x
+- **Base de données** : MySQL 8.0+ (pymysql 1.1.0)
+- **Déploiement** : Gunicorn, Nginx
+
+## Structure de la base de données
+
+### Tables principales
+- **utilisateur** : Profils utilisateurs avec photos, géolocalisation, statistiques
+- **region** : Régions du Cameroun
+- **quartier** : Communes/arrondissements
+- **alerte_globale** : Alertes pour la bannière
+
+### Colonnes utilisateur
+- Informations de base (nom, email, mot de passe, âge, genre)
+- Localisation (region_id, quartier_id, latitude, longitude)
+- Photos (photos JSON, photo_principale)
+- Statistiques (nombre_visites, derniere_connexion, en_ligne)
+- Contact (contact_whatsapp, contact_direct)
+- Admin (est_admin, actif)
+
+## Sécurité
+
+- Sessions HTTPOnly et SameSite=Lax
+- Hachage des mots de passe
+- Protection CSRF
+- Validation des entrées
+- Gestion des rôles admin
+
+## Licence
+
+Ce projet est propriétaire. Tous droits réservés.
