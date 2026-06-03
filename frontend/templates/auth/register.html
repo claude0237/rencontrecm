@@ -1,0 +1,250 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Inscription - RencontresCM{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-8">
+    <h1 class="text-3xl font-bold text-rose text-center mb-8">Inscription</h1>
+    
+    <form x-data="{ 
+        email: '', 
+        password: '',
+        nom: '',
+        age: '',
+        genre: '',
+        region_id: '',
+        quartier_id: '',
+        description: '',
+        photos: [],
+        contact_whatsapp: '',
+        contact_direct: '',
+        latitude: null,
+        longitude: null,
+        equipement: '',
+        regions: [],
+        quartiers: [],
+        loading: false,
+        uploading: false,
+        error: '',
+        init() {
+            fetch('/api/v1/regions')
+                .then(r => r.json())
+                .then(data => this.regions = data.regions);
+            this.getGeolocation();
+            this.getEquipment();
+        },
+        loadQuartiers() {
+            if (this.region_id) {
+                fetch(`/api/v1/quartiers/${this.region_id}`)
+                    .then(r => r.json())
+                    .then(data => this.quartiers = data.quartiers);
+            } else {
+                this.quartiers = [];
+            }
+        },
+        getGeolocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        this.latitude = position.coords.latitude;
+                        this.longitude = position.coords.longitude;
+                    },
+                    (error) => {
+                        console.log('Erreur de géolocalisation:', error);
+                    }
+                );
+            }
+        },
+        getEquipment() {
+            const ua = navigator.userAgent;
+            let browser = 'Unknown';
+            let os = 'Unknown';
+            
+            if (ua.indexOf('Firefox') > -1) browser = 'Firefox';
+            else if (ua.indexOf('Chrome') > -1) browser = 'Chrome';
+            else if (ua.indexOf('Safari') > -1) browser = 'Safari';
+            else if (ua.indexOf('Edge') > -1) browser = 'Edge';
+            else if (ua.indexOf('Opera') > -1) browser = 'Opera';
+            
+            if (ua.indexOf('Win') > -1) os = 'Windows';
+            else if (ua.indexOf('Mac') > -1) os = 'MacOS';
+            else if (ua.indexOf('Linux') > -1) os = 'Linux';
+            else if (ua.indexOf('Android') > -1) os = 'Android';
+            else if (ua.indexOf('iOS') > -1) os = 'iOS';
+            
+            this.equipement = `${os} - ${browser}`;
+        },
+        uploadPhoto(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            this.uploading = true;
+            const formData = new FormData();
+            formData.append('photo', file);
+            
+            fetch('/api/v1/upload-photo-public', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.photo_url) {
+                    this.photos.push(data.photo_url);
+                }
+                this.uploading = false;
+            })
+            .catch(err => {
+                console.error('Error uploading photo:', err);
+                alert('Erreur lors de l\'upload de la photo');
+                this.uploading = false;
+            });
+        }
+    }" @submit.prevent="register" x-init="init()">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="mb-4">
+                <label class="block text-charcoal font-semibold mb-2">Email</label>
+                <input type="email" x-model="email" required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-charcoal font-semibold mb-2">Mot de passe</label>
+                <input type="password" x-model="password" required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-charcoal font-semibold mb-2">Nom</label>
+                <input type="text" x-model="nom" required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-charcoal font-semibold mb-2">Âge</label>
+                <input type="number" x-model="age" required min="18"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-charcoal font-semibold mb-2">Genre</label>
+                <select x-model="genre" required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                    <option value="">Sélectionner</option>
+                    <option value="homme">Homme</option>
+                    <option value="femme">Femme</option>
+                </select>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-charcoal font-semibold mb-2">Ville</label>
+                <select x-model="region_id" @change="loadQuartiers()" required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                    <option value="">Sélectionner</option>
+                    <template x-for="region in regions" :key="region.id">
+                        <option :value="region.id" x-text="region.nom"></option>
+                    </template>
+                </select>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-charcoal font-semibold mb-2">Commune/Arrondissement</label>
+                <select x-model="quartier_id" :disabled="!region_id" required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose disabled:opacity-50">
+                    <option value="">Sélectionner d'abord une ville</option>
+                    <template x-for="quartier in quartiers" :key="quartier.id">
+                        <option :value="quartier.id" x-text="quartier.nom"></option>
+                    </template>
+                </select>
+            </div>
+            
+            <div class="mb-4 md:col-span-2">
+                <label class="block text-charcoal font-semibold mb-2">Description</label>
+                <textarea x-model="description" rows="3"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"></textarea>
+            </div>
+            
+            <div class="mb-4 md:col-span-2">
+                <label class="block text-charcoal font-semibold mb-2">Photo de profil</label>
+                <input type="file" @change="uploadPhoto" accept="image/*"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                <div x-show="uploading" class="text-gray-500 text-sm mt-1">Upload en cours...</div>
+                <div x-show="photos.length > 0" class="text-green-600 text-sm mt-1">Photo téléchargée avec succès</div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-charcoal font-semibold mb-2">WhatsApp (optionnel)</label>
+                <input type="text" x-model="contact_whatsapp"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+            </div>
+            
+            <div class="mb-4 md:col-span-2">
+                <label class="block text-charcoal font-semibold mb-2">Contact direct (optionnel)</label>
+                <input type="text" x-model="contact_direct"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+            </div>
+        </div>
+        
+        <div x-show="error" x-text="error" class="text-rose mb-4"></div>
+        
+        <button type="submit" :disabled="loading"
+            class="w-full bg-rose text-white py-3 rounded-lg font-semibold hover:bg-rose-dark transition disabled:opacity-50">
+            <span x-show="!loading">S'inscrire</span>
+            <span x-show="loading">Inscription...</span>
+        </button>
+    </form>
+    
+    <p class="text-center mt-6 text-charcoal">
+        Déjà inscrit? 
+        <a href="/login" class="text-rose font-semibold hover:underline">Se connecter</a>
+    </p>
+</div>
+
+{% block extra_scripts %}
+<script>
+function register(event) {
+    this.loading = true;
+    this.error = '';
+    
+    const payload = {
+        email: this.email,
+        password: this.password,
+        nom: this.nom,
+        age: parseInt(this.age),
+        genre: this.genre,
+        region_id: parseInt(this.region_id),
+        quartier_id: parseInt(this.quartier_id),
+        description: this.description,
+        photos: this.photos,
+        contact_whatsapp: this.contact_whatsapp,
+        contact_direct: this.contact_direct,
+        equipement: this.equipement
+    };
+    
+    if (this.latitude !== null && this.longitude !== null) {
+        payload.latitude = this.latitude;
+        payload.longitude = this.longitude;
+    }
+    
+    fetch('/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            this.error = data.error;
+        } else {
+            window.location.href = '/';
+        }
+    })
+    .catch(err => {
+        this.error = 'Erreur lors de l\'inscription';
+    })
+    .finally(() => {
+        this.loading = false;
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}

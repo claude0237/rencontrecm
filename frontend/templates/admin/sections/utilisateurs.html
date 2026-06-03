@@ -1,0 +1,144 @@
+<h1 class="text-4xl font-bold text-rose mb-8">Gestion des Utilisateurs</h1>
+
+<!-- Search -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6" x-data="adminUsers()" x-init="loadUsers()">
+    <div class="flex gap-4 mb-4">
+        <input type="text" x-model="search" @keyup.enter="loadUsers()" placeholder="Rechercher par email ou nom..."
+            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+        <button @click="loadUsers()" :disabled="loading"
+            class="bg-rose text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-dark transition disabled:opacity-50">
+            <span x-show="!loading">Rechercher</span>
+            <span x-show="loading">Recherche...</span>
+        </button>
+    </div>
+    
+    <!-- Users Table -->
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[800px]">
+            <thead>
+                <tr class="border-b">
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Email</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Nom</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Genre</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Ville</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">En Ligne</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Position</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Équipement</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Statut</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Admin</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Dernière connexion</th>
+                    <th class="text-left py-3 px-4 text-sm md:text-base">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="user in utilisateurs" :key="user.id">
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-4 text-sm md:text-base" x-text="user.email"></td>
+                        <td class="py-3 px-4 text-sm md:text-base" x-text="user.nom"></td>
+                        <td class="py-3 px-4 text-sm md:text-base" x-text="user.genre"></td>
+                        <td class="py-3 px-4 text-sm md:text-base" x-text="user.region_nom"></td>
+                        <td class="py-3 px-4 text-sm md:text-base">
+                            <span :class="user.en_ligne === 'Oui' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
+                                class="px-3 py-1 rounded-full text-sm font-semibold"
+                                x-text="user.en_ligne"></span>
+                        </td>
+                        <td class="py-3 px-4 text-sm md:text-base">
+                            <span x-text="user.latitude && user.longitude ? `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}` : '-'"></span>
+                        </td>
+                        <td class="py-3 px-4 text-sm md:text-base" x-text="user.equipement || '-'"></td>
+                        <td class="py-3 px-4 text-sm md:text-base">
+                            <span :class="user.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                                class="px-3 py-1 rounded-full text-sm font-semibold"
+                                x-text="user.actif ? 'Actif' : 'Inactif'"></span>
+                        </td>
+                        <td class="py-3 px-4 text-sm md:text-base">
+                            <span :class="user.est_admin ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'"
+                                class="px-3 py-1 rounded-full text-sm font-semibold"
+                                x-text="user.est_admin ? 'Oui' : 'Non'"></span>
+                        </td>
+                        <td class="py-3 px-4 text-sm md:text-base">
+                            <span x-text="user.derniere_connexion ? new Date(user.derniere_connexion).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Jamais'" class="text-sm text-gray-600"></span>
+                        </td>
+                        <td class="py-3 px-4 text-sm md:text-base">
+                            <div class="flex gap-2 flex-wrap">
+                                <button @click="toggleStatus(user)" :disabled="user.est_admin"
+                                    class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:opacity-50"
+                                    x-text="user.actif ? 'Désactiver' : 'Activer'"></button>
+                                <button @click="toggleAdmin(user)" :disabled="user.id === 1"
+                                    class="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 disabled:opacity-50"
+                                    x-text="user.est_admin ? 'Révoquer' : 'Promouvoir'"></button>
+                                <button @click="deleteUser(user)" :disabled="user.est_admin"
+                                    class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 disabled:opacity-50">Supprimer</button>
+                            </div>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+    
+    <div x-show="utilisateurs.length === 0" class="text-center py-8 text-gray-500">
+        Aucun utilisateur trouvé
+    </div>
+</div>
+
+<script>
+function adminUsers() {
+    return {
+        search: '',
+        utilisateurs: [],
+        loading: false,
+        loadUsers() {
+            this.loading = true;
+            const url = this.search ? `/api/v1/admin/utilisateurs?search=${this.search}` : '/api/v1/admin/utilisateurs';
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    this.utilisateurs = data.utilisateurs;
+                    this.loading = false;
+                })
+                .catch(err => {
+                    console.error('Error loading users:', err);
+                    this.loading = false;
+                });
+        },
+        toggleStatus(user) {
+            if (!confirm(`Voulez-vous vraiment ${user.actif ? 'désactiver' : 'activer'} cet utilisateur?`)) return;
+            fetch(`/api/v1/admin/utilisateur/${user.id}/actif`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actif: !user.actif })
+            })
+            .then(r => r.json())
+            .then(data => {
+                user.actif = !user.actif;
+            })
+            .catch(err => console.error('Error toggling status:', err));
+        },
+        toggleAdmin(user) {
+            if (!confirm(`Voulez-vous vraiment ${user.est_admin ? 'révoquer les droits admin de' : 'promouvoir comme admin'} cet utilisateur?`)) return;
+            fetch(`/api/v1/admin/utilisateur/${user.id}/admin`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ est_admin: !user.est_admin })
+            })
+            .then(r => r.json())
+            .then(data => {
+                user.est_admin = !user.est_admin;
+            })
+            .catch(err => console.error('Error toggling admin:', err));
+        },
+        deleteUser(user) {
+            if (!confirm(`Voulez-vous vraiment supprimer définitivement cet utilisateur?`)) return;
+            fetch(`/api/v1/admin/utilisateur/${user.id}`, {
+                method: 'DELETE'
+            })
+            .then(r => r.json())
+            .then(data => {
+                this.utilisateurs = this.utilisateurs.filter(u => u.id !== user.id);
+            })
+            .catch(err => console.error('Error deleting user:', err));
+        }
+    };
+}
+</script>

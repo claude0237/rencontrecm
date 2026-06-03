@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration - RencontresCM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        :root {
+            --rose: #e8536a;
+            --cream: #fdf6f0;
+            --charcoal: #1c1c2e;
+        }
+        .bg-rose { background-color: var(--rose); }
+        .bg-cream { background-color: var(--cream); }
+        .bg-charcoal { background-color: var(--charcoal); }
+        .text-rose { color: var(--rose); }
+        .text-cream { color: var(--cream); }
+        .text-charcoal { color: var(--charcoal); }
+        .hover\:bg-rose-dark:hover { background-color: #d6455c; }
+        [x-cloak] { display: none !important; }
+        
+        html, body {
+            height: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-cream" x-data="{ activeSection: 'dashboard', sidebarOpen: false }" x-cloak>
+    <!-- Admin Navigation -->
+    <nav class="bg-charcoal text-cream shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <a href="/" class="text-2xl font-bold text-rose">RencontresCM</a>
+                
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex space-x-4">
+                    <a href="/" class="hover:text-rose transition">Accueil</a>
+                    <a href="/profil" class="hover:text-rose transition">Profil</a>
+                    <a href="/admin/dashboard" class="hover:text-rose transition">Admin</a>
+                    <a href="/logout" class="hover:text-rose transition">Déconnexion</a>
+                </div>
+                
+                <!-- Mobile Menu Button -->
+                <button @click="sidebarOpen = !sidebarOpen" class="md:hidden text-rose focus:outline-none">
+                    <svg x-show="!sidebarOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                    <svg x-show="sidebarOpen" x-cloak class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Mobile Menu -->
+            <div x-show="sidebarOpen" x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 transform -translate-y-2"
+                 x-transition:enter-end="opacity-100 transform translate-y-0"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100 transform translate-y-0"
+                 x-transition:leave-end="opacity-0 transform -translate-y-2"
+                 class="md:hidden pb-4" x-cloak>
+                <div class="flex flex-col space-y-2">
+                    <a href="/" @click="sidebarOpen = false" class="hover:text-rose transition py-2">Accueil</a>
+                    <a href="/profil" @click="sidebarOpen = false" class="hover:text-rose transition py-2">Profil</a>
+                    <a href="/admin/dashboard" @click="sidebarOpen = false" class="hover:text-rose transition py-2">Admin</a>
+                    <a href="/logout" @click="sidebarOpen = false" class="hover:text-rose transition py-2">Déconnexion</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <aside class="hidden md:block w-64 bg-charcoal text-cream shadow-lg">
+            <div class="p-6">
+                <h2 class="text-2xl font-bold text-rose mb-6">Administration</h2>
+                <nav class="space-y-2">
+                    <button @click="activeSection = 'dashboard'" 
+                        :class="activeSection === 'dashboard' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        📊 Dashboard
+                    </button>
+                    <button @click="activeSection = 'utilisateurs'" 
+                        :class="activeSection === 'utilisateurs' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        👥 Utilisateurs
+                    </button>
+                    <button @click="activeSection = 'geographie'" 
+                        :class="activeSection === 'geographie' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        🌍 Géographie
+                    </button>
+                    <button @click="activeSection = 'alertes'" 
+                        :class="activeSection === 'alertes' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        📢 Alertes
+                    </button>
+                </nav>
+            </div>
+            <div class="p-6 border-t border-gray-700">
+                <a href="/" class="block text-center text-rose hover:underline">← Retour au site</a>
+            </div>
+        </aside>
+        
+        <!-- Mobile Sidebar Overlay -->
+        <div x-show="sidebarOpen" x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40" x-cloak
+             @click="sidebarOpen = false"></div>
+        
+        <!-- Mobile Sidebar -->
+        <aside x-show="sidebarOpen" x-transition:enter="transition ease-out duration-200"
+               x-transition:enter-start="transform -translate-x-full"
+               x-transition:enter-end="transform translate-x-0"
+               x-transition:leave="transition ease-in duration-150"
+               x-transition:leave-start="transform translate-x-0"
+               x-transition:leave-end="transform -translate-x-full"
+               class="md:hidden fixed inset-y-0 left-0 w-64 bg-charcoal text-cream shadow-lg z-50" x-cloak>
+            <div class="p-6">
+                <h2 class="text-2xl font-bold text-rose mb-6">Administration</h2>
+                <nav class="space-y-2">
+                    <button @click="activeSection = 'dashboard'; sidebarOpen = false" 
+                        :class="activeSection === 'dashboard' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        📊 Dashboard
+                    </button>
+                    <button @click="activeSection = 'utilisateurs'; sidebarOpen = false" 
+                        :class="activeSection === 'utilisateurs' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        👥 Utilisateurs
+                    </button>
+                    <button @click="activeSection = 'geographie'; sidebarOpen = false" 
+                        :class="activeSection === 'geographie' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        🌍 Géographie
+                    </button>
+                    <button @click="activeSection = 'alertes'; sidebarOpen = false" 
+                        :class="activeSection === 'alertes' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        📢 Alertes
+                    </button>
+                </nav>
+            </div>
+            <div class="p-6 border-t border-gray-700">
+                <a href="/" class="block text-center text-rose hover:underline">← Retour au site</a>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="flex-1 p-8 bg-cream">
+            <!-- Dashboard Section -->
+            <div x-show="activeSection === 'dashboard'" x-transition>
+                {% include 'admin/sections/dashboard.html' %}
+            </div>
+            
+            <!-- Utilisateurs Section -->
+            <div x-show="activeSection === 'utilisateurs'" x-transition>
+                {% include 'admin/sections/utilisateurs.html' %}
+            </div>
+            
+            <!-- Géographie Section -->
+            <div x-show="activeSection === 'geographie'" x-transition>
+                {% include 'admin/sections/geographie.html' %}
+            </div>
+            
+            <!-- Alertes Section -->
+            <div x-show="activeSection === 'alertes'" x-transition>
+                {% include 'admin/sections/alertes.html' %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

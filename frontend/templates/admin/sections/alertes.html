@@ -1,0 +1,137 @@
+<h1 class="text-4xl font-bold text-rose mb-8">Système d'Alerte (Flash Infos)</h1>
+
+<div class="bg-white rounded-lg shadow-lg p-6" x-data="{ 
+    alertes: [], 
+    newAlerte: { message: '', active: true }, 
+    showAddForm: false,
+    loadAlertes() {
+        fetch('/api/v1/admin/alertes')
+            .then(r => r.json())
+            .then(data => {
+                this.alertes = data.alertes;
+            })
+            .catch(err => console.error('Error loading alertes:', err));
+    },
+    addAlerte() {
+        console.log('addAlerte called, message:', this.newAlerte.message);
+        
+        if (!this.newAlerte.message || !this.newAlerte.message.trim()) {
+            alert('Veuillez entrer un message');
+            return;
+        }
+        
+        console.log('Sending alerte:', this.newAlerte);
+        
+        fetch('/api/v1/admin/alerte', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.newAlerte)
+        })
+        .then(r => {
+            console.log('Response status:', r.status);
+            return r.json();
+        })
+        .then(data => {
+            console.log('Response data:', data);
+            if (data.error) {
+                console.error('Error adding alerte:', data.error);
+                alert('Erreur: ' + data.error);
+            } else {
+                this.alertes.push(data.alerte);
+                this.newAlerte = { message: '', active: true };
+                this.showAddForm = false;
+            }
+        })
+        .catch(err => {
+            console.error('Error adding alerte:', err);
+            alert('Erreur lors de la création de l\'alerte');
+        });
+    },
+    toggleActive(alerte) {
+        fetch(`/api/v1/admin/alerte/${alerte.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active: !alerte.active })
+        })
+        .then(r => r.json())
+        .then(data => {
+            alerte.active = !alerte.active;
+        })
+        .catch(err => console.error('Error toggling alerte:', err));
+    },
+    editAlerte(alerte) {
+        const newMessage = prompt('Nouveau message:', alerte.message);
+        if (!newMessage) return;
+        
+        fetch(`/api/v1/admin/alerte/${alerte.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: newMessage })
+        })
+        .then(r => r.json())
+        .then(data => {
+            alerte.message = data.alerte.message;
+        })
+        .catch(err => console.error('Error updating alerte:', err));
+    },
+    deleteAlerte(alerte) {
+        if (!confirm('Voulez-vous vraiment supprimer cette alerte?')) return;
+        
+        fetch(`/api/v1/admin/alerte/${alerte.id}`, {
+            method: 'DELETE'
+        })
+        .then(r => r.json())
+        .then(data => {
+            this.alertes = this.alertes.filter(a => a.id !== alerte.id);
+        })
+        .catch(err => console.error('Error deleting alerte:', err));
+    }
+}" x-init="loadAlertes()">
+    <h2 class="text-2xl font-bold text-rose mb-4">Alertes Globales</h2>
+    
+    <button @click="showAddForm = !showAddForm" class="bg-rose text-white px-4 py-2 rounded-lg mb-4 hover:bg-rose-dark transition">
+        <span x-show="!showAddForm">+ Créer une alerte</span>
+        <span x-show="showAddForm">Annuler</span>
+    </button>
+    
+    <div x-show="showAddForm" class="mb-4 p-4 bg-gray-50 rounded-lg">
+        <form @submit.prevent="addAlerte()">
+            <textarea x-model="newAlerte.message" placeholder="Message de l'alerte" rows="3" required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose mb-2"></textarea>
+            <div class="flex items-center gap-2 mb-2">
+                <input type="checkbox" x-model="newAlerte.active" id="activeAlerte" class="w-4 h-4">
+                <label for="activeAlerte">Activer immédiatement</label>
+            </div>
+            <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition">Créer</button>
+        </form>
+    </div>
+    
+    <div class="space-y-4 max-h-96 overflow-y-auto">
+        <template x-for="alerte in alertes" :key="alerte.id">
+            <div class="p-4 border rounded-lg" :class="alerte.active ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-300'">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <p x-text="alerte.message" class="mb-2"></p>
+                        <div class="flex items-center gap-4 text-sm text-gray-500">
+                            <span x-text="`Créée le: ${new Date(alerte.date_creation).toLocaleDateString('fr-FR')}`"></span>
+                            <span :class="alerte.active ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'"
+                                x-text="alerte.active ? '✓ Active' : '✗ Inactive'"></span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 ml-4">
+                        <button @click="toggleActive(alerte)" 
+                            class="px-3 py-1 rounded text-sm transition"
+                            :class="alerte.active ? 'bg-yellow-500 text-white hover:bg-yellow-600' : 'bg-green-500 text-white hover:bg-green-600'"
+                            x-text="alerte.active ? 'Désactiver' : 'Activer'"></button>
+                        <button @click="editAlerte(alerte)" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition">Modifier</button>
+                        <button @click="deleteAlerte(alerte)" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition">Supprimer</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+    
+    <div x-show="alertes.length === 0" class="text-center py-8 text-gray-500">
+        Aucune alerte créée
+    </div>
+</div>

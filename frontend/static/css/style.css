@@ -1,0 +1,6 @@
+/* Custom styles for RencontresCM */
+/* Additional custom styles can be added here */
+
+[x-cloak] {
+    display: none !important;
+}

@@ -1,0 +1,196 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Configuration Géographique - RencontresCM{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <h1 class="text-4xl font-bold text-rose mb-8">Configuration Géographique</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Regions Section -->
+        <div class="bg-white rounded-lg shadow-lg p-6" x-data="{ regions: [], newRegion: '', showAddForm: false }" x-init="loadRegions()">
+            <h2 class="text-2xl font-bold text-rose mb-4">Villes (Régions)</h2>
+            
+            <button @click="showAddForm = !showAddForm" class="bg-rose text-white px-4 py-2 rounded-lg mb-4 hover:bg-rose-dark transition">
+                <span x-show="!showAddForm">+ Ajouter une ville</span>
+                <span x-show="showAddForm">Annuler</span>
+            </button>
+            
+            <div x-show="showAddForm" class="mb-4 p-4 bg-gray-50 rounded-lg">
+                <input type="text" x-model="newRegion" placeholder="Nom de la ville"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose mb-2">
+                <button @click="addRegion()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition">Ajouter</button>
+            </div>
+            
+            <div class="space-y-2">
+                <template x-for="region in regions" :key="region.id">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span x-text="region.nom"></span>
+                        <div class="flex gap-2">
+                            <button @click="editRegion(region)" class="text-blue-500 hover:text-blue-700">Modifier</button>
+                            <button @click="deleteRegion(region)" class="text-red-500 hover:text-red-700">Supprimer</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        
+        <!-- Quartiers Section -->
+        <div class="bg-white rounded-lg shadow-lg p-6" x-data="{ quartiers: [], regions: [], newQuartier: { nom: '', region_id: '' }, showAddForm: false }" x-init="loadQuartiers(); loadRegions()">
+            <h2 class="text-2xl font-bold text-rose mb-4">Communes (Quartiers)</h2>
+            
+            <button @click="showAddForm = !showAddForm" class="bg-rose text-white px-4 py-2 rounded-lg mb-4 hover:bg-rose-dark transition">
+                <span x-show="!showAddForm">+ Ajouter une commune</span>
+                <span x-show="showAddForm">Annuler</span>
+            </button>
+            
+            <div x-show="showAddForm" class="mb-4 p-4 bg-gray-50 rounded-lg">
+                <select x-model="newQuartier.region_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose mb-2">
+                    <option value="">Sélectionner une ville</option>
+                    <template x-for="region in regions" :key="region.id">
+                        <option :value="region.id" x-text="region.nom"></option>
+                    </template>
+                </select>
+                <input type="text" x-model="newQuartier.nom" placeholder="Nom de la commune"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose mb-2">
+                <button @click="addQuartier()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition">Ajouter</button>
+            </div>
+            
+            <div class="space-y-2">
+                <template x-for="quartier in quartiers" :key="quartier.id">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <span x-text="quartier.nom" class="font-semibold"></span>
+                            <span x-text="` (${quartier.region_nom})`" class="text-gray-500 text-sm"></span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button @click="editQuartier(quartier)" class="text-blue-500 hover:text-blue-700">Modifier</button>
+                            <button @click="deleteQuartier(quartier)" class="text-red-500 hover:text-red-700">Supprimer</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+function loadRegions() {
+    fetch('/api/v1/regions')
+        .then(r => r.json())
+        .then(data => {
+            this.regions = data.regions;
+        })
+        .catch(err => console.error('Error loading regions:', err));
+}
+
+function loadQuartiers() {
+    fetch('/api/v1/quartiers')
+        .then(r => r.json())
+        .then(data => {
+            this.quartiers = data.quartiers;
+        })
+        .catch(err => console.error('Error loading quartiers:', err));
+}
+
+function addRegion() {
+    if (!this.newRegion.trim()) return;
+    
+    fetch('/api/v1/admin/regions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom: this.newRegion })
+    })
+    .then(r => r.json())
+    .then(data => {
+        this.regions.push(data.region);
+        this.newRegion = '';
+        this.showAddForm = false;
+    })
+    .catch(err => console.error('Error adding region:', err));
+}
+
+function editRegion(region) {
+    const newName = prompt('Nouveau nom:', region.nom);
+    if (!newName) return;
+    
+    fetch(`/api/v1/admin/region/${region.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom: newName })
+    })
+    .then(r => r.json())
+    .then(data => {
+        region.nom = data.region.nom;
+    })
+    .catch(err => console.error('Error updating region:', err));
+}
+
+function deleteRegion(region) {
+    if (!confirm(`Voulez-vous vraiment supprimer la ville "${region.nom}"?`)) return;
+    
+    fetch(`/api/v1/admin/region/${region.id}`, {
+        method: 'DELETE'
+    })
+    .then(r => r.json())
+    .then(data => {
+        this.regions = this.regions.filter(r => r.id !== region.id);
+    })
+    .catch(err => {
+        alert(err.error || 'Erreur lors de la suppression');
+        console.error('Error deleting region:', err);
+    });
+}
+
+function addQuartier() {
+    if (!this.newQuartier.nom.trim() || !this.newQuartier.region_id) return;
+    
+    fetch('/api/v1/admin/quartiers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.newQuartier)
+    })
+    .then(r => r.json())
+    .then(data => {
+        this.quartiers.push(data.quartier);
+        this.newQuartier = { nom: '', region_id: '' };
+        this.showAddForm = false;
+    })
+    .catch(err => console.error('Error adding quartier:', err));
+}
+
+function editQuartier(quartier) {
+    const newName = prompt('Nouveau nom:', quartier.nom);
+    if (!newName) return;
+    
+    fetch(`/api/v1/admin/quartier/${quartier.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom: newName })
+    })
+    .then(r => r.json())
+    .then(data => {
+        quartier.nom = data.quartier.nom;
+    })
+    .catch(err => console.error('Error updating quartier:', err));
+}
+
+function deleteQuartier(quartier) {
+    if (!confirm(`Voulez-vous vraiment supprimer la commune "${quartier.nom}"?`)) return;
+    
+    fetch(`/api/v1/admin/quartier/${quartier.id}`, {
+        method: 'DELETE'
+    })
+    .then(r => r.json())
+    .then(data => {
+        this.quartiers = this.quartiers.filter(q => q.id !== quartier.id);
+    })
+    .catch(err => {
+        alert(err.error || 'Erreur lors de la suppression');
+        console.error('Error deleting quartier:', err);
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,553 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Profil - RencontresCM{% endblock %}
+
+{% block content %}
+<div x-data="{ 
+    profil: null,
+    currentUser: null,
+    editing: false,
+    loading: true,
+    saving: false,
+    uploading: false,
+    regions: [],
+    quartiers: [],
+    newPhotos: [],
+    similarProfiles: [],
+    similarPagination: {
+        currentPage: 1,
+        totalPages: 1,
+        total: 0,
+        limit: 6
+    },
+    userLocation: { lat: null, lon: null },
+    formData: {
+        nom: '',
+        age: '',
+        genre: '',
+        description: '',
+        photos: [],
+        photo_principale: 0,
+        contact_whatsapp: '',
+        contact_direct: '',
+        email: '',
+        password: '',
+        region_id: '',
+        quartier_id: ''
+    },
+    init() {
+        this.loadCurrentUser();
+        this.loadRegions();
+        this.getUserLocation();
+    },
+    loadProfil() {
+        const pathParts = window.location.pathname.split('/');
+        const userId = pathParts[pathParts.length - 1];
+        
+        if (isNaN(userId) || userId === 'profil') {
+            this.loadCurrentUserProfil();
+        } else {
+            const params = new URLSearchParams();
+            if (this.userLocation.lat) params.append('lat', this.userLocation.lat);
+            if (this.userLocation.lon) params.append('lon', this.userLocation.lon);
+            
+            fetch(`/api/v1/profil/${userId}?${params}`)
+                .then(r => r.json())
+                .then(data => {
+                    this.profil = data.profil;
+                    this.loading = false;
+                    this.loadSimilarProfiles();
+                    // Increment visit count when viewing another user's profile
+                    if (this.currentUser && this.currentUser.id !== this.profil.id) {
+                        fetch(`/api/v1/profil/${userId}/visite`, { method: 'POST' })
+                            .then(r => r.json())
+                            .then(data => {
+                                this.profil.nombre_visites = data.nombre_visites;
+                            })
+                            .catch(err => console.error('Error incrementing visit count:', err));
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading profil:', err);
+                    this.loading = false;
+                });
+        }
+    },
+    loadCurrentUserProfil() {
+        fetch('/api/v1/auth/me')
+            .then(r => r.json())
+            .then(data => {
+                if (data.user) {
+                    this.profil = data.user;
+                    this.currentUser = data.user;
+                }
+                this.loading = false;
+            })
+            .catch(err => {
+                console.error('Error loading current user profil:', err);
+                this.loading = false;
+            });
+    },
+    loadCurrentUser() {
+        fetch('/api/v1/auth/me')
+            .then(r => r.json())
+            .then(data => {
+                if (data.user) {
+                    this.currentUser = data.user;
+                }
+            });
+    },
+    loadRegions() {
+        fetch('/api/v1/regions')
+            .then(r => r.json())
+            .then(data => {
+                this.regions = data.regions;
+            })
+            .catch(err => console.error('Error loading regions:', err));
+    },
+    loadQuartiers(regionId) {
+        fetch(`/api/v1/quartiers/${regionId}`)
+            .then(r => r.json())
+            .then(data => {
+                this.quartiers = data.quartiers;
+            })
+            .catch(err => console.error('Error loading quartiers:', err));
+    },
+    getUserLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    this.userLocation.lat = position.coords.latitude;
+                    this.userLocation.lon = position.coords.longitude;
+                    this.loadProfil();
+                },
+                (error) => {
+                    console.log('Erreur de géolocalisation:', error);
+                    this.loadProfil();
+                }
+            );
+        } else {
+            this.loadProfil();
+        }
+    },
+    loadSimilarProfiles() {
+        if (!this.profil) return;
+        
+        const params = new URLSearchParams();
+        if (this.userLocation.lat) params.append('lat', this.userLocation.lat);
+        if (this.userLocation.lon) params.append('lon', this.userLocation.lon);
+        if (this.profil.genre) params.append('genre', this.profil.genre);
+        params.append('page', this.similarPagination.currentPage);
+        params.append('limit', this.similarPagination.limit);
+        
+        fetch(`/api/v1/profils/recommandes?${params}`)
+            .then(r => r.json())
+            .then(data => {
+                // Filter out the current profile from recommendations
+                this.similarProfiles = data.profils.filter(p => p.id !== this.profil.id);
+                this.similarPagination.total = data.total;
+                this.similarPagination.totalPages = data.total_pages;
+                this.similarPagination.currentPage = data.page;
+            })
+            .catch(err => console.error('Error loading similar profiles:', err));
+    },
+    prevSimilarPage() {
+        if (this.similarPagination.currentPage > 1) {
+            this.similarPagination.currentPage--;
+            this.loadSimilarProfiles();
+        }
+    },
+    nextSimilarPage() {
+        if (this.similarPagination.currentPage < this.similarPagination.totalPages) {
+            this.similarPagination.currentPage++;
+            this.loadSimilarProfiles();
+        }
+    },
+    goToSimilarPage(page) {
+        this.similarPagination.currentPage = page;
+        this.loadSimilarProfiles();
+    },
+    uploadPhotos(event) {
+        const files = event.target.files;
+        if (!files.length) return;
+        
+        this.uploading = true;
+        const uploadPromises = [];
+        
+        for (let i = 0; i < files.length; i++) {
+            const formData = new FormData();
+            formData.append('photo', files[i]);
+            
+            uploadPromises.push(
+                fetch('/api/v1/upload-photo', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.photo_url) {
+                        this.newPhotos.push(data.photo_url);
+                    }
+                })
+            );
+        }
+        
+        Promise.all(uploadPromises)
+            .then(() => {
+                this.uploading = false;
+                this.formData.photos = [...(this.profil.photos || []), ...this.newPhotos];
+                event.target.value = '';
+            })
+            .catch(err => {
+                console.error('Error uploading photos:', err);
+                alert('Erreur lors de l\'upload des photos');
+                this.uploading = false;
+            });
+    },
+    removePhoto(index) {
+        this.formData.photos.splice(index, 1);
+    },
+    startEdit() {
+        this.editing = true;
+        this.newPhotos = [];
+        this.formData = {
+            nom: this.profil.nom,
+            age: this.profil.age,
+            genre: this.profil.genre,
+            description: this.profil.description || '',
+            photos: this.profil.photos || [],
+            photo_principale: this.profil.photo_principale || 0,
+            contact_whatsapp: this.profil.contact_whatsapp || '',
+            contact_direct: this.profil.contact_direct || '',
+            email: this.profil.email,
+            password: '',
+            region_id: this.profil.region_id,
+            quartier_id: this.profil.quartier_id
+        };
+        if (this.profil.region_id) {
+            this.loadQuartiers(this.profil.region_id);
+        }
+    },
+    cancelEdit() {
+        this.editing = false;
+        this.newPhotos = [];
+        this.formData = {
+            nom: '',
+            age: '',
+            genre: '',
+            description: '',
+            photos: [],
+            contact_whatsapp: '',
+            contact_direct: '',
+            email: '',
+            password: '',
+            region_id: '',
+            quartier_id: ''
+        };
+    },
+    saveProfil() {
+        this.saving = true;
+        const data = {};
+        if (this.formData.nom) data.nom = this.formData.nom;
+        if (this.formData.age) data.age = parseInt(this.formData.age);
+        if (this.formData.genre) data.genre = this.formData.genre;
+        if (this.formData.description) data.description = this.formData.description;
+        if (this.formData.photos && this.formData.photos.length > 0) {
+            data.photos = this.formData.photos;
+            console.log('Saving photos:', this.formData.photos);
+        }
+        if (this.formData.photo_principale !== undefined) data.photo_principale = this.formData.photo_principale;
+        if (this.formData.contact_whatsapp) data.contact_whatsapp = this.formData.contact_whatsapp;
+        if (this.formData.contact_direct) data.contact_direct = this.formData.contact_direct;
+        if (this.formData.email) data.email = this.formData.email;
+        if (this.formData.password) data.password = this.formData.password;
+        if (this.formData.region_id) data.region_id = parseInt(this.formData.region_id);
+        if (this.formData.quartier_id) data.quartier_id = parseInt(this.formData.quartier_id);
+        
+        console.log('Saving profile data:', data);
+        
+        fetch('/api/v1/profil', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                this.profil = data.user;
+                this.currentUser = data.user;
+                this.editing = false;
+                this.newPhotos = [];
+                console.log('Profile updated successfully:', data.user);
+                alert('Profil mis à jour avec succès');
+            }
+            this.saving = false;
+        })
+        .catch(err => {
+            console.error('Error saving profil:', err);
+            alert('Erreur lors de la mise à jour du profil');
+            this.saving = false;
+        });
+    }
+}" x-init="init()">
+    <div x-show="loading" class="text-center py-12">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-rose border-t-transparent"></div>
+        <p class="mt-4 text-charcoal">Chargement...</p>
+    </div>
+    
+    <div x-show="!loading && profil" class="max-w-4xl mx-auto px-4">
+        <div class="bg-white rounded-lg shadow-xl overflow-hidden">
+            <div class="p-4 md:p-8">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h1 class="text-2xl md:text-4xl font-bold text-charcoal mb-2" x-text="profil.nom"></h1>
+                        <p class="text-rose text-lg md:text-2xl font-semibold" x-text="profil.age + ' ans'"></p>
+                    </div>
+                    <template x-if="currentUser && currentUser.id === profil.id">
+                        <button @click="startEdit()" x-show="!editing" class="bg-rose text-white px-4 py-2 rounded-lg hover:bg-rose-dark transition text-sm md:text-base">Modifier</button>
+                    </template>
+                </div>
+                
+                <div x-show="!editing">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6">
+                        <div class="bg-cream p-4 rounded-lg">
+                            <h3 class="font-bold text-charcoal mb-2 text-sm md:text-base">Localisation</h3>
+                            <p class="text-gray-600 text-sm md:text-base" x-text="profil.region_nom + ', ' + profil.quartier_nom"></p>
+                        </div>
+                        
+                        <div class="bg-cream p-4 rounded-lg">
+                            <h3 class="font-bold text-charcoal mb-2 text-sm md:text-base">Genre</h3>
+                            <p class="text-gray-600 text-sm md:text-base" x-text="profil.genre === 'homme' ? 'Homme' : 'Femme'"></p>
+                        </div>
+                        
+                        <div class="bg-cream p-4 rounded-lg">
+                            <h3 class="font-bold text-charcoal mb-2 text-sm md:text-base">Visites</h3>
+                            <p class="text-gray-600 text-sm md:text-base" x-text="(profil.nombre_visites || 0) + ' fois'"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6">
+                        <template x-if="profil.distance !== null && (!currentUser || currentUser.id !== profil.id)">
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <h3 class="font-bold text-charcoal mb-2 text-sm md:text-base">Distance</h3>
+                                <p class="text-green-600 text-sm md:text-base font-semibold" x-text="profil.distance + ' km'"></p>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="font-bold text-charcoal mb-2 text-sm md:text-base">À propos</h3>
+                        <p class="text-gray-600 text-sm md:text-base" x-text="profil.description || 'Aucune description'"></p>
+                    </div>
+                    
+                    <template x-if="profil.photos && profil.photos.length > 0">
+                        <div class="mb-6">
+                            <h3 class="font-bold text-charcoal mb-2 text-sm md:text-base">Photos</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <template x-for="(photo, index) in profil.photos" :key="index">
+                                    <img :src="photo" :alt="'Photo ' + (index + 1)" class="w-full h-32 md:h-48 object-cover rounded-lg cursor-pointer hover:opacity-80 transition">
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
+                        <template x-if="profil.contact_whatsapp">
+                            <div class="bg-green-50 p-4 rounded-lg flex items-center">
+                                <span class="text-xl md:text-2xl mr-3">📱</span>
+                                <div>
+                                    <h3 class="font-bold text-charcoal mb-1 text-sm md:text-base">WhatsApp</h3>
+                                    <p class="text-gray-600 text-sm md:text-base" x-text="profil.contact_whatsapp"></p>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <template x-if="profil.contact_direct">
+                            <div class="bg-blue-50 p-4 rounded-lg flex items-center">
+                                <span class="text-xl md:text-2xl mr-3">📞</span>
+                                <div>
+                                    <h3 class="font-bold text-charcoal mb-1 text-sm md:text-base">Contact direct</h3>
+                                    <p class="text-gray-600 text-sm md:text-base" x-text="profil.contact_direct"></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <a href="/" class="bg-charcoal text-white px-6 py-3 rounded-lg hover:bg-charcoal-light transition text-center">Retour à l'accueil</a>
+                    </div>
+                </div>
+                
+                <div x-show="editing" class="space-y-4">
+                    <h2 class="text-xl md:text-2xl font-bold text-charcoal mb-4">Modifier mon profil</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-charcoal mb-1">Email</label>
+                            <input type="email" x-model="formData.email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-charcoal mb-1">Nouveau mot de passe (optionnel)</label>
+                            <input type="password" x-model="formData.password" placeholder="Laisser vide pour ne pas changer" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-charcoal mb-1">Nom</label>
+                            <input type="text" x-model="formData.nom" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-charcoal mb-1">Âge</label>
+                            <input type="number" x-model="formData.age" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-charcoal mb-1">Genre</label>
+                            <select x-model="formData.genre" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                                <option value="homme">Homme</option>
+                                <option value="femme">Femme</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-charcoal mb-1">Région</label>
+                            <select x-model="formData.region_id" @change="loadQuartiers($event.target.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                                <option value="">Sélectionner une région</option>
+                                <template x-for="region in regions" :key="region.id">
+                                    <option :value="region.id" x-text="region.nom"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-charcoal mb-1">Quartier</label>
+                            <select x-model="formData.quartier_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                                <option value="">Sélectionner un quartier</option>
+                                <template x-for="quartier in quartiers" :key="quartier.id">
+                                    <option :value="quartier.id" x-text="quartier.nom"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-charcoal mb-1">Description</label>
+                            <textarea x-model="formData.description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"></textarea>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-charcoal mb-1">Photos</label>
+                            <input type="file" multiple accept="image/*" @change="uploadPhotos($event)" :disabled="uploading" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                            <p x-show="uploading" class="text-sm text-gray-500 mt-1">Upload en cours...</p>
+                        </div>
+                        
+                        <template x-if="formData.photos && formData.photos.length > 0">
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-charcoal mb-2">Photos uploadées</label>
+                                <div class="grid grid-cols-3 md:grid-cols-4 gap-2">
+                                    <template x-for="(photo, index) in formData.photos" :key="index">
+                                        <div class="relative">
+                                            <img :src="photo" :alt="'Photo ' + (index + 1)" class="w-full h-20 md:h-24 object-cover rounded-lg cursor-pointer border-2" :class="formData.photo_principale === index ? 'border-rose' : 'border-transparent'" @click="formData.photo_principale = index">
+                                            <button @click="removePhoto(index)" type="button" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition">×</button>
+                                            <template x-if="formData.photo_principale === index">
+                                                <div class="absolute bottom-1 left-1 bg-rose text-white text-xs px-2 py-1 rounded">Principale</div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                                <p class="text-sm text-gray-500 mt-2">Cliquez sur une photo pour la définir comme photo de profil</p>
+                            </div>
+                        </template>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-charcoal mb-1">WhatsApp</label>
+                            <input type="text" x-model="formData.contact_whatsapp" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-charcoal mb-1">Contact direct</label>
+                            <input type="text" x-model="formData.contact_direct" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4 mt-6">
+                        <button @click="saveProfil()" :disabled="saving" class="bg-rose text-white px-6 py-3 rounded-lg hover:bg-rose-dark transition disabled:opacity-50">
+                            <span x-show="!saving">Enregistrer</span>
+                            <span x-show="saving">Enregistrement...</span>
+                        </button>
+                        <button @click="cancelEdit()" class="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition">Annuler</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Similar Profiles Section -->
+    <div x-show="!loading && profil && similarProfiles.length > 0" class="mt-12 max-w-6xl mx-auto px-4">
+        <h2 class="text-2xl font-bold text-charcoal mb-6">Profils similaires</h2>
+        <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <template x-for="profil in similarProfiles" :key="profil.id">
+                <a :href="'/profil/' + profil.id" class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition block">
+                    <div class="h-48 bg-gradient-to-br from-rose to-rose-light flex items-center justify-center">
+                        <template x-if="profil.photos && profil.photos.length > 0">
+                            <img :src="profil.photos[0]" :alt="profil.nom" class="w-full h-full object-cover">
+                        </template>
+                        <template x-if="!profil.photos || profil.photos.length === 0">
+                            <template x-if="profil.photo_url">
+                                <img :src="profil.photo_url" :alt="profil.nom" class="w-full h-full object-cover">
+                            </template>
+                            <template x-if="!profil.photo_url">
+                                <div class="text-white text-6xl font-bold" x-text="profil.nom.charAt(0)"></div>
+                            </template>
+                        </template>
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-lg font-bold text-charcoal" x-text="profil.nom"></h3>
+                        <p class="text-rose font-semibold" x-text="profil.age + ' ans'"></p>
+                        <p class="text-gray-600 text-sm" x-text="profil.region_nom + ', ' + profil.quartier_nom"></p>
+                        <template x-if="profil.distance !== null">
+                            <p class="text-green-600 text-sm font-semibold mt-1" x-text="profil.distance + ' km'"></p>
+                        </template>
+                    </div>
+                </a>
+            </template>
+        </div>
+        
+        <!-- Pagination Controls -->
+        <div x-show="similarPagination.totalPages > 1" class="flex justify-center items-center gap-2 mt-6">
+            <button @click="prevSimilarPage()" :disabled="similarPagination.currentPage === 1" 
+                class="px-4 py-2 bg-rose text-white rounded-lg hover:bg-rose-dark transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Précédent
+            </button>
+            <template x-for="page in Math.min(similarPagination.totalPages, 5)" :key="page">
+                <button @click="goToSimilarPage(page)" 
+                    :class="similarPagination.currentPage === page ? 'bg-rose text-white' : 'bg-white text-charcoal hover:bg-gray-100'"
+                    class="px-4 py-2 rounded-lg transition"
+                    x-text="page">
+                </button>
+            </template>
+            <template x-if="similarPagination.totalPages > 5">
+                <span class="px-2">...</span>
+            </template>
+            <template x-if="similarPagination.totalPages > 5">
+                <button @click="goToSimilarPage(similarPagination.totalPages)" 
+                    :class="similarPagination.currentPage === similarPagination.totalPages ? 'bg-rose text-white' : 'bg-white text-charcoal hover:bg-gray-100'"
+                    class="px-4 py-2 rounded-lg transition"
+                    x-text="similarPagination.totalPages">
+                </button>
+            </template>
+            <button @click="nextSimilarPage()" :disabled="similarPagination.currentPage === similarPagination.totalPages" 
+                class="px-4 py-2 bg-rose text-white rounded-lg hover:bg-rose-dark transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Suivant
+            </button>
+        </div>
+    </div>
+    
+    <div x-show="!loading && !profil" class="text-center py-12">
+        <p class="text-xl text-charcoal">Profil non trouvé</p>
+        <a href="/" class="inline-block mt-4 bg-rose text-white px-6 py-3 rounded-lg hover:bg-rose-dark transition">Retour à l'accueil</a>
+    </div>
+</div>
+{% endblock %}

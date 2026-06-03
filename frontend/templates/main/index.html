@@ -1,0 +1,270 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Accueil - RencontresCM{% endblock %}
+
+{% block content %}
+<div x-data="{ 
+    profils: [],
+    recommended: [],
+    regions: [],
+    currentUser: null,
+    userLocation: { lat: null, lon: null },
+    filters: {
+        region_id: '',
+        genre: '',
+        age_min: '',
+        age_max: ''
+    },
+    pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        total: 0,
+        limit: 9
+    },
+    loading: false,
+    sidebarOpen: false,
+    init() {
+        this.loadCurrentUser();
+        this.loadRegions();
+        this.getUserLocation();
+    },
+    loadCurrentUser() {
+        fetch('/api/v1/auth/me')
+            .then(r => r.json())
+            .then(data => {
+                if (data.user) {
+                    this.currentUser = data.user;
+                }
+            })
+            .catch(err => {
+                console.log('Not authenticated or error loading user');
+            });
+    },
+    getUserLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    this.userLocation.lat = position.coords.latitude;
+                    this.userLocation.lon = position.coords.longitude;
+                    this.loadRecommended();
+                    this.loadProfils();
+                },
+                (error) => {
+                    console.log('Erreur de géolocalisation:', error);
+                    this.loadRecommended();
+                    this.loadProfils();
+                }
+            );
+        } else {
+            this.loadRecommended();
+            this.loadProfils();
+        }
+    },
+    loadProfils() {
+        this.loading = true;
+        const params = new URLSearchParams();
+        if (this.filters.region_id) params.append('region_id', this.filters.region_id);
+        if (this.filters.genre) params.append('genre', this.filters.genre);
+        if (this.filters.age_min) params.append('age_min', this.filters.age_min);
+        if (this.filters.age_max) params.append('age_max', this.filters.age_max);
+        if (this.userLocation.lat) params.append('lat', this.userLocation.lat);
+        if (this.userLocation.lon) params.append('lon', this.userLocation.lon);
+        params.append('page', this.pagination.currentPage);
+        params.append('limit', this.pagination.limit);
+        
+        fetch(`/api/v1/profils?${params}`)
+            .then(r => r.json())
+            .then(data => {
+                this.profils = data.profils;
+                this.pagination.total = data.total;
+                this.pagination.totalPages = data.total_pages;
+                this.pagination.currentPage = data.page;
+                this.loading = false;
+            });
+    },
+    goToPage(page) {
+        this.pagination.currentPage = page;
+        this.loadProfils();
+    },
+    nextPage() {
+        if (this.pagination.currentPage < this.pagination.totalPages) {
+            this.pagination.currentPage++;
+            this.loadProfils();
+        }
+    },
+    prevPage() {
+        if (this.pagination.currentPage > 1) {
+            this.pagination.currentPage--;
+            this.loadProfils();
+        }
+    },
+    loadRegions() {
+        fetch('/api/v1/regions')
+            .then(r => r.json())
+            .then(data => this.regions = data.regions);
+    },
+    loadRecommended() {
+        const params = new URLSearchParams();
+        if (this.userLocation.lat) params.append('lat', this.userLocation.lat);
+        if (this.userLocation.lon) params.append('lon', this.userLocation.lon);
+        params.append('limit', 10);
+        
+        fetch(`/api/v1/profils/recommandes?${params}`)
+            .then(r => r.json())
+            .then(data => {
+                this.recommended = data.profils;
+            });
+    }
+}" x-init="init()" class="min-h-screen overflow-x-hidden">
+    <!-- Horizontal Filters -->
+    <div class="bg-white rounded-lg shadow-lg p-2 mb-6 max-w-4xl mx-auto">
+        <div class="flex flex-wrap gap-3 items-center">
+            <div class="flex-shrink-0">
+                <label class="block text-charcoal font-semibold mb-1 text-xs">Ville</label>
+                <select x-model="filters.region_id" @change="loadProfils()"
+                    class="px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:border-rose text-sm">
+                    <option value="">Toutes les villes</option>
+                    <template x-for="region in regions" :key="region.id">
+                        <option :value="region.id" x-text="region.nom"></option>
+                    </template>
+                </select>
+            </div>
+            
+            <div class="flex-shrink-0">
+                <label class="block text-charcoal font-semibold mb-1 text-xs">Genre</label>
+                <select x-model="filters.genre" @change="loadProfils()"
+                    class="px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:border-rose text-sm">
+                    <option value="">Tous</option>
+                    <option value="homme">Homme</option>
+                    <option value="femme">Femme</option>
+                </select>
+            </div>
+            
+            <div class="flex-shrink-0">
+                <label class="block text-charcoal font-semibold mb-1 text-xs">Âge min</label>
+                <input type="number" x-model="filters.age_min" @change="loadProfils()" min="18"
+                    class="w-20 px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:border-rose text-sm">
+            </div>
+            
+            <div class="flex-shrink-0">
+                <label class="block text-charcoal font-semibold mb-1 text-xs">Âge max</label>
+                <input type="number" x-model="filters.age_max" @change="loadProfils()" min="18"
+                    class="w-20 px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:border-rose text-sm">
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <main class="overflow-x-hidden">
+            <h1 class="text-4xl font-bold text-rose text-center mb-8">Trouvez votre âme sœur</h1>
+            
+            <!-- Recommended Profiles Horizontal Scroll -->
+            <div class="max-w-6xl mx-auto px-4 mb-8">
+                <h2 class="text-2xl font-bold text-charcoal mb-4">Profils recommandés</h2>
+                <div class="flex overflow-x-auto gap-4 pb-4 scrollbar-thin scrollbar-thumb-rose scrollbar-track-gray-200">
+                    <template x-for="profil in recommended" :key="profil.id">
+                        <div class="flex-shrink-0 w-48 bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition">
+                            <div class="h-32 bg-gradient-to-br from-rose to-rose-light flex items-center justify-center">
+                                <template x-if="profil.photos && profil.photos.length > 0">
+                                    <img :src="profil.photos[0]" :alt="profil.nom" class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!profil.photos || profil.photos.length === 0">
+                                    <template x-if="profil.photo_url">
+                                        <img :src="profil.photo_url" :alt="profil.nom" class="w-full h-full object-cover">
+                                    </template>
+                                    <template x-if="!profil.photo_url">
+                                        <div class="text-white text-3xl font-bold" x-text="profil.nom.charAt(0)"></div>
+                                    </template>
+                                </template>
+                            </div>
+                            <div class="p-3">
+                                <h3 class="text-lg font-bold text-charcoal truncate" x-text="profil.nom"></h3>
+                                <p class="text-rose font-semibold text-sm" x-text="profil.age + ' ans'"></p>
+                                <p class="text-gray-600 text-xs truncate" x-text="profil.region_nom"></p>
+                                <template x-if="profil.distance !== null">
+                                    <p class="text-green-600 text-xs font-semibold" x-text="profil.distance + ' km'"></p>
+                                </template>
+                                <a :href="'/profil/' + profil.id" class="inline-block mt-2 bg-rose text-white px-3 py-1 rounded-lg hover:bg-rose-dark transition text-sm">Voir</a>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            
+            <!-- All Profiles Grid -->
+            <div x-show="loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-rose border-t-transparent"></div>
+                <p class="mt-4 text-charcoal">Chargement des profils...</p>
+            </div>
+            
+            <div x-show="!loading" class="max-w-6xl mx-auto px-4">
+                <div class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
+                <template x-for="profil in profils" :key="profil.id">
+                    <a :href="'/profil/' + profil.id" class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition block">
+                        <div class="h-48 bg-gradient-to-br from-rose to-rose-light flex items-center justify-center">
+                            <template x-if="profil.photos && profil.photos.length > 0 && profil.photo_principale !== undefined && profil.photos[profil.photo_principale]">
+                                <img :src="profil.photos[profil.photo_principale]" :alt="profil.nom" class="w-full h-full object-cover">
+                            </template>
+                            <template x-if="!profil.photos || profil.photos.length === 0 || profil.photo_principale === undefined || !profil.photos[profil.photo_principale]">
+                                <template x-if="profil.photos && profil.photos.length > 0">
+                                    <img :src="profil.photos[0]" :alt="profil.nom" class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!profil.photos || profil.photos.length === 0">
+                                    <template x-if="profil.photo_url">
+                                        <img :src="profil.photo_url" :alt="profil.nom" class="w-full h-full object-cover">
+                                    </template>
+                                    <template x-if="!profil.photo_url">
+                                        <div class="text-white text-6xl font-bold" x-text="profil.nom.charAt(0)"></div>
+                                    </template>
+                                </template>
+                            </template>
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-xl font-bold text-charcoal" x-text="profil.nom"></h3>
+                            <p class="text-rose font-semibold" x-text="profil.age + ' ans'"></p>
+                            <p class="text-gray-600" x-text="profil.region_nom + ', ' + profil.quartier_nom"></p>
+                            <template x-if="profil.distance !== null">
+                                <p class="text-green-600 text-sm font-semibold mt-1" x-text="profil.distance + ' km'"></p>
+                            </template>
+                        </div>
+                    </a>
+                </template>
+                </div>
+            </div>
+            
+            <!-- Pagination Controls -->
+            <div x-show="!loading && pagination.totalPages > 1" class="flex justify-center items-center gap-2 pb-8">
+                <button @click="prevPage()" :disabled="pagination.currentPage === 1" 
+                    class="px-4 py-2 bg-rose text-white rounded-lg hover:bg-rose-dark transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    Précédent
+                </button>
+                <template x-for="page in Math.min(pagination.totalPages, 5)" :key="page">
+                    <button @click="goToPage(page)" 
+                        :class="pagination.currentPage === page ? 'bg-rose text-white' : 'bg-white text-charcoal hover:bg-gray-100'"
+                        class="px-4 py-2 rounded-lg transition"
+                        x-text="page">
+                    </button>
+                </template>
+                <template x-if="pagination.totalPages > 5">
+                    <span class="px-2">...</span>
+                </template>
+                <template x-if="pagination.totalPages > 5">
+                    <button @click="goToPage(pagination.totalPages)" 
+                        :class="pagination.currentPage === pagination.totalPages ? 'bg-rose text-white' : 'bg-white text-charcoal hover:bg-gray-100'"
+                        class="px-4 py-2 rounded-lg transition"
+                        x-text="pagination.totalPages">
+                    </button>
+                </template>
+                <button @click="nextPage()" :disabled="pagination.currentPage === pagination.totalPages" 
+                    class="px-4 py-2 bg-rose text-white rounded-lg hover:bg-rose-dark transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    Suivant
+                </button>
+            </div>
+            
+            <div x-show="!loading && profils.length === 0" class="text-center py-12">
+                <p class="text-xl text-charcoal">Aucun profil trouvé</p>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

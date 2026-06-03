@@ -1,0 +1,45 @@
+<h1 class="text-4xl font-bold text-rose mb-8">Tableau de bord Administrateur</h1>
+
+<!-- Statistics Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8" x-data="{ stats: null, loading: true }" x-init="
+    fetch('/api/v1/admin/statistiques')
+        .then(r => r.json())
+        .then(data => {
+            stats = data;
+            loading = false;
+        })
+        .catch(err => {
+            console.error('Error loading stats:', err);
+            loading = false;
+        });
+">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-lg font-semibold text-charcoal mb-2">Total Inscrits</h2>
+        <p class="text-4xl font-bold text-rose" x-text="stats?.total_users || '-'"></p>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-lg font-semibold text-charcoal mb-2">Hommes</h2>
+        <p class="text-4xl font-bold text-blue-600" x-text="stats?.hommes || '-'"></p>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-lg font-semibold text-charcoal mb-2">Femmes</h2>
+        <p class="text-4xl font-bold text-pink-600" x-text="stats?.femmes || '-'"></p>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-lg font-semibold text-charcoal mb-2">Actifs</h2>
+        <p class="text-4xl font-bold text-green-600" x-text="stats?.actifs || '-'"></p>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-lg font-semibold text-charcoal mb-2">Désactivés</h2>
+        <p class="text-4xl font-bold text-red-600" x-text="stats?.inactifs || '-'"></p>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-lg font-semibold text-charcoal mb-2">Ville la plus active</h2>
+        <p class="text-2xl font-bold text-purple-600" x-text="stats?.most_active_region || '-'"></p>
+    </div>
+</div>
