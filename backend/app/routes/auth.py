@@ -1,8 +1,11 @@
 from flask import Blueprint, request, session, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 from app import db
-from app.models import Utilisateur
+from app.models import Utilisateur, PasswordReset
+from app.services.notification_service import NotificationService
 import json
+import random
+import string
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -125,3 +128,138 @@ def get_current_user():
         return jsonify({'error': 'Utilisateur non trouvé'}), 404
     
     return jsonify({'user': user.to_dict()}), 200
+
+# Password Reset Endpoints
+@auth_bp.route('/password-reset/request', methods=['POST'])
+def request_password_reset():
+    data = request.get_json()
+    
+    if not data or ('email' not in data and 'contact_direct' not in data):
+        return jsonify({'error': 'Email ou téléphone requis'}), 400
+    
+    identifier = data.get('email') or data.get('contact_direct')
+    
+    # Find user by email or phone
+    user = None
+    if '@' in identifier:
+        user = Utilisateur.query.filter_by(email=identifier).first()
+    else:
+        user = Utilisateur.query.filter_by(contact_direct=identifier).first()
+    
+    if not user:
+        # Don't reveal if user exists for security
+        return jsonify({'message': 'Si le compte existe, un code de réinitialisation a été envoyé'}), 200
+    
+    # Generate 6-digit code
+    code = ''.join(random.choices(string.digits, k=6))
+    
+    # Create password reset record
+    # Invalidate previous unused codes for this user
+    PasswordReset.query.filter_by(email=user.email, used=False).update({'used': True})
+    
+    reset = PasswordReset(
+        email=user.email,
+        telephone=user.contact_direct,
+        code=code,
+        expires_at=datetime.utcnow() + timedelta(minutes=15)
+    )
+    
+    db.session.add(reset)
+    db.session.commit()
+    
+    # Send code via email or SMS
+    # Try email first, if configured
+    email_sent = NotificationService.send_password_reset_code(user, code, method='email')
+    
+    # If email not sent or SMS is preferred, try SMS
+    if not email_sent:
+        sms_sent = NotificationService.send_password_reset_code(user, code, method='sms')
+        if not sms_sent:
+            # Fallback to console if neither works
+            print(f"Password reset code for {user.email}: {code}")
+    
+    return jsonify({'message': 'Si le compte existe, un code de réinitialisation a été envoyé'}), 200
+
+@auth_bp.route('/password-reset/verify', methods=['POST'])
+def verify_reset_code():
+    data = request.get_json()
+    
+    if not data or 'code' not in data or ('email' not in data and 'contact_direct' not in data):
+        return jsonify({'error': 'Code et identifiant requis'}), 400
+    
+    identifier = data.get('email') or data.get('contact_direct')
+    code = data['code']
+    
+    # Find user
+    user = None
+    if '@' in identifier:
+        user = Utilisateur.query.filter_by(email=identifier).first()
+    else:
+        user = Utilisateur.query.filter_by(contact_direct=identifier).first()
+    
+    if not user:
+        return jsonify({'error': 'Utilisateur non trouvé'}), 404
+    
+    # Find valid reset code
+    reset = PasswordReset.query.filter_by(
+        email=user.email,
+        code=code,
+        used=False
+    ).order_by(PasswordReset.created_at.desc()).first()
+    
+    if not reset:
+        return jsonify({'error': 'Code invalide'}), 400
+    
+    if reset.is_expired():
+        return jsonify({'error': 'Code expiré'}), 400
+    
+    if reset.attempts >= 3:
+        return jsonify({'error': 'Trop de tentatives. Veuillez demander un nouveau code.'}), 400
+    
+    # Increment attempts
+    reset.attempts += 1
+    db.session.commit()
+    
+    if reset.code == code:
+        return jsonify({'message': 'Code validé avec succès', 'email': user.email}), 200
+    else:
+        return jsonify({'error': 'Code incorrect'}), 400
+
+@auth_bp.route('/password-reset/reset', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    
+    if not data or not all(k in data for k in ['email', 'code', 'new_password']):
+        return jsonify({'error': 'Email, code et nouveau mot de passe requis'}), 400
+    
+    email = data['email']
+    code = data['code']
+    new_password = data['new_password']
+    
+    # Find user
+    user = Utilisateur.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'error': 'Utilisateur non trouvé'}), 404
+    
+    # Find valid reset code
+    reset = PasswordReset.query.filter_by(
+        email=email,
+        code=code,
+        used=False
+    ).order_by(PasswordReset.created_at.desc()).first()
+    
+    if not reset or not reset.is_valid():
+        return jsonify({'error': 'Code invalide ou expiré'}), 400
+    
+    # Reset password
+    user.set_password(new_password)
+    
+    # Mark code as used
+    reset.used = True
+    
+    db.session.commit()
+    
+    # Send confirmation email
+    NotificationService.send_password_reset_confirmation(user)
+    
+    return jsonify({'message': 'Mot de passe réinitialisé avec succès'}), 200

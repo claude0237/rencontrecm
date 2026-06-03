@@ -38,6 +38,21 @@ def create_app(config_class=Config):
         from flask import render_template
         return render_template('auth/register.html')
     
+    @app.route('/forgot-password')
+    def forgot_password():
+        from flask import render_template
+        return render_template('auth/forgot_password.html')
+    
+    @app.route('/verify-code')
+    def verify_code():
+        from flask import render_template
+        return render_template('auth/verify_code.html')
+    
+    @app.route('/reset-password')
+    def reset_password():
+        from flask import render_template
+        return render_template('auth/reset_password.html')
+    
     @app.route('/profil/<int:user_id>')
     def profil(user_id):
         from flask import render_template

@@ -1,0 +1,72 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Vérifier le code - RencontresCM{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-white rounded-lg shadow-xl p-8">
+    <h1 class="text-3xl font-bold text-rose text-center mb-8">Vérifier le code</h1>
+    
+    <form x-data="{ 
+        identifier: new URLSearchParams(window.location.search).get('identifier') || '',
+        code: '',
+        loading: false,
+        error: '',
+        success: '',
+        verifyCode() {
+            this.loading = true;
+            this.error = '';
+            this.success = '';
+            
+            const payload = { code: this.code };
+            if (this.identifier.includes('@')) {
+                payload.email = this.identifier;
+            } else {
+                payload.contact_direct = this.identifier;
+            }
+            
+            fetch('/api/v1/auth/password-reset/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    this.error = data.error;
+                } else {
+                    this.success = data.message;
+                    setTimeout(() => {
+                        window.location.href = '/reset-password?email=' + encodeURIComponent(data.email) + '&code=' + this.code;
+                    }, 1000);
+                }
+            })
+            .catch(err => {
+                this.error = 'Erreur lors de la vérification';
+            })
+            .finally(() => {
+                this.loading = false;
+            });
+        }
+    }" @submit.prevent="verifyCode">
+        <div class="mb-6">
+            <label class="block text-charcoal font-semibold mb-2">Code de réinitialisation</label>
+            <input type="text" x-model="code" required maxlength="6" pattern="[0-9]{6}"
+                placeholder="Entrez le code à 6 chiffres"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-rose text-center text-2xl tracking-widest">
+        </div>
+        
+        <div x-show="error" x-text="error" class="text-rose mb-4"></div>
+        <div x-show="success" x-text="success" class="text-green-600 mb-4"></div>
+        
+        <button type="submit" :disabled="loading"
+            class="w-full bg-rose text-white py-3 rounded-lg font-semibold hover:bg-rose-dark transition disabled:opacity-50">
+            <span x-show="!loading">Vérifier</span>
+            <span x-show="loading">Vérification...</span>
+        </button>
+    </form>
+    
+    <p class="text-center mt-6 text-charcoal">
+        <a href="/forgot-password" class="text-rose font-semibold hover:underline">Renvoyer le code</a>
+    </p>
+</div>
+{% endblock %}

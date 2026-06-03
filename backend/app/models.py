@@ -115,3 +115,31 @@ class AlerteGlobale(db.Model):
             'active': self.active,
             'date_creation': self.date_creation.isoformat()
         }
+
+class PasswordReset(db.Model):
+    __tablename__ = 'password_resets'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), nullable=False)
+    telephone = db.Column(db.String(20), nullable=True)
+    code = db.Column(db.String(6), nullable=False)
+    attempts = db.Column(db.Integer, default=0)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    used = db.Column(db.Boolean, default=False)
+    
+    def is_expired(self):
+        return datetime.utcnow() > self.expires_at
+    
+    def is_valid(self):
+        return not self.used and not self.is_expired() and self.attempts < 3
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'email': self.email,
+            'telephone': self.telephone,
+            'expires_at': self.expires_at.isoformat(),
+            'attempts': self.attempts,
+            'is_valid': self.is_valid()
+        }
