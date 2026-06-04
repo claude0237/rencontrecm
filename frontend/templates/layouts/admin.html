@@ -113,6 +113,11 @@
                         class="w-full text-left px-4 py-3 rounded-lg transition">
                         👁️ Statistiques Visites
                     </button>
+                    <button @click="activeSection = 'statistiques-whatsapp'" 
+                        :class="activeSection === 'statistiques-whatsapp' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        💬 Statistiques WhatsApp
+                    </button>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -176,6 +181,11 @@
                         class="w-full text-left px-4 py-3 rounded-lg transition">
                         👁️ Statistiques Visites
                     </button>
+                    <button @click="activeSection = 'statistiques-whatsapp'; sidebarOpen = false" 
+                        :class="activeSection === 'statistiques-whatsapp' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-3 rounded-lg transition">
+                        💬 Statistiques WhatsApp
+                    </button>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -218,6 +228,11 @@
             <!-- Statistiques Visites Section -->
             <div x-show="activeSection === 'statistiques-visites'" x-transition>
                 {% include 'admin/statistiques_visites.html' %}
+            </div>
+            
+            <!-- Statistiques WhatsApp Section -->
+            <div x-show="activeSection === 'statistiques-whatsapp'" x-transition>
+                {% include 'admin/statistiques_whatsapp.html' %}
             </div>
         </main>
     </div>

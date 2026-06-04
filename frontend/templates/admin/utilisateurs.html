@@ -29,6 +29,7 @@
                         <th class="text-left py-3 px-4">Ville</th>
                         <th class="text-left py-3 px-4">Statut</th>
                         <th class="text-left py-3 px-4">Admin</th>
+                        <th class="text-left py-3 px-4">WhatsApp</th>
                         <th class="text-left py-3 px-4">Actions</th>
                     </tr>
                 </thead>
@@ -50,6 +51,11 @@
                                     x-text="user.est_admin ? 'Oui' : 'Non'"></span>
                             </td>
                             <td class="py-3 px-4">
+                                <span :class="user.whatsapp_enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                                    class="px-3 py-1 rounded-full text-sm font-semibold"
+                                    x-text="user.whatsapp_enabled ? 'Oui' : 'Non'"></span>
+                            </td>
+                            <td class="py-3 px-4">
                                 <div class="flex gap-2">
                                     <button @click="toggleStatus(user)" :disabled="user.est_admin"
                                         class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:opacity-50"
@@ -57,6 +63,9 @@
                                     <button @click="toggleAdmin(user)" :disabled="user.id === currentUser.id"
                                         class="bg-purple-500 text-white px-3 py-1 rounded text-sm hover:bg-purple-600 disabled:opacity-50"
                                         x-text="user.est_admin ? 'Révoquer' : 'Promouvoir'"></button>
+                                    <button @click="toggleWhatsApp(user)"
+                                        class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
+                                        x-text="user.whatsapp_enabled ? 'Désactiver WA' : 'Activer WA'"></button>
                                     <button @click="deleteUser(user)" :disabled="user.est_admin"
                                         class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 disabled:opacity-50">Supprimer</button>
                                 </div>
@@ -119,6 +128,21 @@ function toggleAdmin(user) {
         user.est_admin = !user.est_admin;
     })
     .catch(err => console.error('Error toggling admin:', err));
+}
+
+function toggleWhatsApp(user) {
+    if (!confirm(`Voulez-vous vraiment ${user.whatsapp_enabled ? 'désactiver' : 'activer'} le WhatsApp pour cet utilisateur?`)) return;
+    
+    fetch(`/api/v1/admin/utilisateur/${user.id}/whatsapp`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whatsapp_enabled: !user.whatsapp_enabled })
+    })
+    .then(r => r.json())
+    .then(data => {
+        user.whatsapp_enabled = !user.whatsapp_enabled;
+    })
+    .catch(err => console.error('Error toggling WhatsApp:', err));
 }
 
 function deleteUser(user) {

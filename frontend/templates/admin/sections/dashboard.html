@@ -45,14 +45,16 @@
 </div>
 
 <!-- Call and Visit Statistics Cards -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8" x-data="{ callStats: null, visitStats: null, loading: true }" x-init="
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" x-data="{ callStats: null, visitStats: null, whatsappStats: null, loading: true }" x-init="
     Promise.all([
         fetch('/api/v1/admin/statistiques/appels').then(r => r.json()),
-        fetch('/api/v1/admin/statistiques/visites').then(r => r.json())
+        fetch('/api/v1/admin/statistiques/visites').then(r => r.json()),
+        fetch('/api/v1/admin/statistiques/whatsapp').then(r => r.json())
     ])
-    .then(([calls, visits]) => {
+    .then(([calls, visits, whatsapp]) => {
         callStats = calls;
         visitStats = visits;
+        whatsappStats = whatsapp;
         loading = false;
     })
     .catch(err => {
@@ -69,6 +71,12 @@
     <div class="bg-purple-50 rounded-lg shadow-lg p-6 cursor-pointer hover:bg-purple-100 transition" @click="activeSection = 'statistiques-visites'">
         <h2 class="text-lg font-semibold text-charcoal mb-2">👁️ Consultations profils</h2>
         <p class="text-4xl font-bold text-purple-600" x-text="visitStats?.total_visits || '-'"></p>
+        <p class="text-sm text-gray-600 mt-2">Cliquez pour voir les détails</p>
+    </div>
+    
+    <div class="bg-teal-50 rounded-lg shadow-lg p-6 cursor-pointer hover:bg-teal-100 transition" @click="activeSection = 'statistiques-whatsapp'">
+        <h2 class="text-lg font-semibold text-charcoal mb-2">💬 Clics WhatsApp</h2>
+        <p class="text-4xl font-bold text-teal-600" x-text="whatsappStats?.total_clicks || '-'"></p>
         <p class="text-sm text-gray-600 mt-2">Cliquez pour voir les détails</p>
     </div>
 </div>

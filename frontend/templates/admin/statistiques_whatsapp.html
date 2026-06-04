@@ -1,0 +1,97 @@
+<h1 class="text-4xl font-bold text-rose mb-8">Statistiques des Clics WhatsApp</h1>
+
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6" x-data="{ 
+    clickerStats: [], 
+    targetStats: [],
+    loading: true,
+    init() {
+        this.loadStatistics();
+    },
+    loadStatistics() {
+        this.loading = true;
+        
+        fetch('/api/v1/admin/statistiques/whatsapp/details')
+            .then(r => r.json())
+            .then(data => {
+                this.clickerStats = data.clicker_stats;
+                this.targetStats = data.target_stats;
+                this.loading = false;
+            })
+            .catch(err => {
+                console.error('Error loading WhatsApp statistics:', err);
+                this.loading = false;
+            });
+    }
+}" x-init="init()">
+    <div class="mb-4">
+        <button @click="loadStatistics()" :disabled="loading"
+            class="bg-rose text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-dark transition disabled:opacity-50">
+            <span x-show="!loading">🔄 Rafraîchir</span>
+            <span x-show="loading">Chargement...</span>
+        </button>
+    </div>
+    
+    <div x-show="loading" class="text-center py-8 text-gray-500">
+        Chargement...
+    </div>
+    
+    <div x-show="!loading">
+        <h2 class="text-2xl font-bold text-charcoal mb-4">💬 Utilisateurs qui ont cliqué sur WhatsApp</h2>
+        <div class="overflow-x-auto mb-8">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-3 px-4">Nom</th>
+                        <th class="text-left py-3 px-4">Email</th>
+                        <th class="text-left py-3 px-4">Total clics</th>
+                        <th class="text-left py-3 px-4">Personnes contactées (uniques)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="stat in clickerStats" :key="stat.user_id">
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-3 px-4" x-text="stat.nom"></td>
+                            <td class="py-3 px-4" x-text="stat.email"></td>
+                            <td class="py-3 px-4">
+                                <span class="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm font-semibold" x-text="stat.total_clicks"></span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold" x-text="stat.unique_clicked"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+            <div x-show="clickerStats.length === 0" class="text-center py-8 text-gray-500">
+                Aucun clic WhatsApp enregistré
+            </div>
+        </div>
+        
+        <h2 class="text-2xl font-bold text-charcoal mb-4">📱 Utilisateurs qui ont été contactés par WhatsApp</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-3 px-4">Nom</th>
+                        <th class="text-left py-3 px-4">Email</th>
+                        <th class="text-left py-3 px-4">Total reçus</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="stat in targetStats" :key="stat.user_id">
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-3 px-4" x-text="stat.nom"></td>
+                            <td class="py-3 px-4" x-text="stat.email"></td>
+                            <td class="py-3 px-4">
+                                <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-semibold" x-text="stat.total_received"></span>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+            <div x-show="targetStats.length === 0" class="text-center py-8 text-gray-500">
+                Aucun contact WhatsApp reçu
+            </div>
+        </div>
+    </div>
+</div>

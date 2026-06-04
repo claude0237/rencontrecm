@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app import db
-from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel
+from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel, WhatsAppClick, WhatsAppSetting
 from app.utils import admin_required
 
 admin_bp = Blueprint('admin', __name__)
@@ -108,6 +108,18 @@ def toggle_user_admin(user_id):
         db.session.commit()
     
     return jsonify({'message': 'Statut admin mis à jour', 'user': user.to_dict()}), 200
+
+@admin_bp.route('/utilisateur/<int:user_id>/whatsapp', methods=['PUT'])
+@admin_required
+def toggle_user_whatsapp(user_id):
+    user = Utilisateur.query.get_or_404(user_id)
+    data = request.get_json()
+    
+    if 'whatsapp_enabled' in data:
+        user.whatsapp_enabled = data['whatsapp_enabled']
+    db.session.commit()
+    
+    return jsonify({'message': 'Statut WhatsApp mis à jour', 'user': user.to_dict()}), 200
 
 # Region CRUD
 @admin_bp.route('/regions', methods=['POST'])
@@ -314,3 +326,95 @@ def get_visit_statistics_details():
             for user in visit_stats
         ]
     }), 200
+
+# WhatsApp statistics
+@admin_bp.route('/statistiques/whatsapp', methods=['GET'])
+def get_whatsapp_statistics():
+    total_clicks = WhatsAppClick.query.count()
+    
+    return jsonify({
+        'total_clicks': total_clicks
+    }), 200
+
+@admin_bp.route('/statistiques/whatsapp/details', methods=['GET'])
+def get_whatsapp_statistics_details():
+    """Get detailed WhatsApp click statistics by user"""
+    from sqlalchemy import func
+    
+    # Get click statistics grouped by clicker
+    clicker_stats = db.session.query(
+        WhatsAppClick.cliquant_id,
+        Utilisateur.nom,
+        Utilisateur.email,
+        func.count(WhatsAppClick.id).label('total_clicks'),
+        func.count(func.distinct(WhatsAppClick.cible_id)).label('unique_clicked')
+    ).join(Utilisateur, WhatsAppClick.cliquant_id == Utilisateur.id)\
+     .group_by(WhatsAppClick.cliquant_id, Utilisateur.nom, Utilisateur.email)\
+     .order_by(func.count(WhatsAppClick.id).desc())\
+     .all()
+    
+    # Get click statistics grouped by target user
+    target_stats = db.session.query(
+        WhatsAppClick.cible_id,
+        Utilisateur.nom,
+        Utilisateur.email,
+        func.count(WhatsAppClick.id).label('total_received')
+    ).join(Utilisateur, WhatsAppClick.cible_id == Utilisateur.id)\
+     .group_by(WhatsAppClick.cible_id, Utilisateur.nom, Utilisateur.email)\
+     .order_by(func.count(WhatsAppClick.id).desc())\
+     .all()
+    
+    return jsonify({
+        'clicker_stats': [
+            {
+                'user_id': stat.cliquant_id,
+                'nom': stat.nom,
+                'email': stat.email,
+                'total_clicks': stat.total_clicks,
+                'unique_clicked': stat.unique_clicked
+            }
+            for stat in clicker_stats
+        ],
+        'target_stats': [
+            {
+                'user_id': stat.cible_id,
+                'nom': stat.nom,
+                'email': stat.email,
+                'total_received': stat.total_received
+            }
+            for stat in target_stats
+        ]
+    }), 200
+
+# WhatsApp settings
+@admin_bp.route('/whatsapp-setting', methods=['GET'])
+def get_whatsapp_setting():
+    setting = WhatsAppSetting.query.first()
+    if not setting:
+        # Create default setting if none exists
+        setting = WhatsAppSetting(
+            default_message='Bonjour {nom}, je vous contacte depuis RencontreCm. Votre profil a retenu mon attention.'
+        )
+        db.session.add(setting)
+        db.session.commit()
+    
+    return jsonify({'setting': setting.to_dict()}), 200
+
+@admin_bp.route('/whatsapp-setting', methods=['PUT'])
+@admin_required
+def update_whatsapp_setting():
+    data = request.get_json()
+    
+    if not data or 'default_message' not in data:
+        return jsonify({'error': 'Message requis'}), 400
+    
+    setting = WhatsAppSetting.query.first()
+    if not setting:
+        setting = WhatsAppSetting(default_message=data['default_message'])
+        db.session.add(setting)
+    else:
+        setting.default_message = data['default_message']
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Message WhatsApp mis à jour', 'setting': setting.to_dict()}), 200

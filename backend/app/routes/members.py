@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app, session
 from app import db
-from app.models import Region, Quartier, Utilisateur, Appel
+from app.models import Region, Quartier, Utilisateur, Appel, WhatsAppClick, WhatsAppSetting
 import json
 import os
 import math
@@ -305,4 +305,51 @@ def track_appel(appele_id):
         'message': 'Appel enregistré',
         'appel': appel.to_dict(),
         'appele_phone': appele.contact_direct
+    }), 200
+
+@members_bp.route('/profil/<int:cible_id>/whatsapp', methods=['POST'])
+def track_whatsapp_click(cible_id):
+    """Track WhatsApp click when user clicks WhatsApp button"""
+    from flask import session
+    
+    cliquant_id = session.get('user_id') if 'user_id' in session else None
+    
+    # Check if target user exists and is active
+    cible = Utilisateur.query.get(cible_id)
+    
+    if not cible:
+        return jsonify({'error': 'Utilisateur non trouvé'}), 404
+    
+    if not cible.actif:
+        return jsonify({'error': 'Ce compte est désactivé'}), 403
+    
+    if not cible.contact_whatsapp:
+        return jsonify({'error': 'Cet utilisateur n\'a pas de WhatsApp'}), 400
+    
+    if not cible.whatsapp_enabled:
+        return jsonify({'error': 'Le contact WhatsApp est désactivé pour cet utilisateur'}), 403
+    
+    # Get default WhatsApp message
+    setting = WhatsAppSetting.query.first()
+    default_message = setting.default_message if setting else 'Bonjour {nom}, je vous contacte depuis RencontreCm.'
+    
+    # Replace {nom} with the target user's name
+    message = default_message.replace('{nom}', cible.nom)
+    
+    # Create WhatsApp click record (cliquant_id can be NULL for anonymous visitors)
+    whatsapp_click = WhatsAppClick(
+        cliquant_id=cliquant_id,
+        cible_id=cible_id
+    )
+    db.session.add(whatsapp_click)
+    db.session.commit()
+    
+    # Format WhatsApp URL
+    whatsapp_number = cible.contact_whatsapp.replace('+', '').replace(' ', '')
+    whatsapp_url = f"https://wa.me/{whatsapp_number}?text={message}"
+    
+    return jsonify({
+        'message': 'Clic WhatsApp enregistré',
+        'whatsapp_click': whatsapp_click.to_dict(),
+        'whatsapp_url': whatsapp_url
     }), 200

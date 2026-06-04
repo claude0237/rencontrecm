@@ -308,6 +308,24 @@
             console.error('Error calling:', err);
             alert('Erreur lors de l\'appel');
         });
+    },
+    envoyerWhatsApp() {
+        fetch(`/api/v1/profil/${this.profil.id}/whatsapp`, {
+            method: 'POST'
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                // Open WhatsApp
+                window.open(data.whatsapp_url, '_blank');
+            }
+        })
+        .catch(err => {
+            console.error('Error sending WhatsApp:', err);
+            alert('Erreur lors de l\'envoi WhatsApp');
+        });
     }
 }" x-init="init()">
     <div x-show="loading" class="text-center py-12">
@@ -373,12 +391,17 @@
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
                         <template x-if="profil.contact_whatsapp">
-                            <div class="bg-green-50 p-4 rounded-lg flex items-center">
-                                <span class="text-xl md:text-2xl mr-3">📱</span>
-                                <div>
-                                    <h3 class="font-bold text-charcoal mb-1 text-sm md:text-base">WhatsApp</h3>
-                                    <p class="text-gray-600 text-sm md:text-base" x-text="profil.contact_whatsapp"></p>
+                            <div class="bg-green-50 p-4 rounded-lg flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <span class="text-xl md:text-2xl mr-3">📱</span>
+                                    <div>
+                                        <h3 class="font-bold text-charcoal mb-1 text-sm md:text-base">WhatsApp</h3>
+                                        <p class="text-gray-600 text-sm md:text-base" x-text="profil.contact_whatsapp"></p>
+                                    </div>
                                 </div>
+                                <template x-if="profil.whatsapp_enabled && (!currentUser || currentUser.id !== profil.id)">
+                                    <button @click="envoyerWhatsApp()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition text-sm md:text-base">💬 WhatsApp</button>
+                                </template>
                             </div>
                         </template>
                         

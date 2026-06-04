@@ -1,5 +1,80 @@
 <h1 class="text-4xl font-bold text-rose mb-8">Système d'Alerte (Flash Infos)</h1>
 
+<!-- WhatsApp Default Message Section -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-6" x-data="{ 
+    whatsappSetting: null,
+    loading: true,
+    editing: false,
+    newMessage: '',
+    loadSetting() {
+        this.loading = true;
+        fetch('/api/v1/admin/whatsapp-setting')
+            .then(r => r.json())
+            .then(data => {
+                this.whatsappSetting = data.setting;
+                this.newMessage = this.whatsappSetting.default_message;
+                this.loading = false;
+            })
+            .catch(err => {
+                console.error('Error loading WhatsApp setting:', err);
+                this.loading = false;
+            });
+    },
+    saveSetting() {
+        if (!this.newMessage || !this.newMessage.trim()) {
+            alert('Veuillez entrer un message');
+            return;
+        }
+        
+        fetch('/api/v1/admin/whatsapp-setting', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ default_message: this.newMessage })
+        })
+        .then(r => r.json())
+        .then(data => {
+            this.whatsappSetting = data.setting;
+            this.editing = false;
+            alert('Message WhatsApp mis à jour avec succès');
+        })
+        .catch(err => {
+            console.error('Error updating WhatsApp setting:', err);
+            alert('Erreur lors de la mise à jour du message');
+        });
+    }
+}" x-init="loadSetting()">
+    <h2 class="text-2xl font-bold text-teal-600 mb-4">💬 Message par défaut WhatsApp</h2>
+    
+    <div x-show="loading" class="text-center py-4 text-gray-500">
+        Chargement...
+    </div>
+    
+    <div x-show="!loading">
+        <div x-show="!editing">
+            <div class="bg-teal-50 p-4 rounded-lg mb-4">
+                <p class="text-sm text-gray-600 mb-2">Message actuel (utilisez {nom} pour le nom du destinataire):</p>
+                <p class="font-semibold text-charcoal" x-text="whatsappSetting?.default_message"></p>
+            </div>
+            <button @click="editing = true" class="bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 transition">Modifier le message</button>
+        </div>
+        
+        <div x-show="editing">
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-charcoal mb-2">Message par défaut WhatsApp:</label>
+                <textarea x-model="newMessage" rows="3" 
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 mb-2"
+                    placeholder="Bonjour {nom}, je vous contacte depuis RencontreCm. Votre profil a retenu mon attention."></textarea>
+                <p class="text-sm text-gray-500">Utilisez {nom} pour insérer automatiquement le nom du destinataire.</p>
+            </div>
+            <div class="flex gap-2">
+                <button @click="saveSetting()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition">Enregistrer</button>
+                <button @click="editing = false; newMessage = whatsappSetting.default_message" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition">Annuler</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alertes Globales Section -->
 <div class="bg-white rounded-lg shadow-lg p-6" x-data="{ 
     alertes: [], 
     newAlerte: { message: '', active: true }, 

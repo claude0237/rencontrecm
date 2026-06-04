@@ -46,6 +46,7 @@ class Utilisateur(db.Model):
     photos = db.Column(db.Text)  # JSON array of photo URLs
     photo_principale = db.Column(db.Integer, default=0)  # Index of the main photo in photos array
     contact_whatsapp = db.Column(db.String(50))
+    whatsapp_enabled = db.Column(db.Boolean, default=True)  # Enable/disable WhatsApp contact
     contact_direct = db.Column(db.String(50), nullable=False, unique=True)  # Numéro de téléphone principal
     actif = db.Column(db.Boolean, default=True)
     disabled_reason = db.Column(db.String(100), nullable=True)  # Raison de désactivation
@@ -91,6 +92,7 @@ class Utilisateur(db.Model):
             'photos': photos_list,
             'photo_principale': self.photo_principale,
             'contact_whatsapp': self.contact_whatsapp,
+            'whatsapp_enabled': self.whatsapp_enabled,
             'contact_direct': self.contact_direct,
             'actif': self.actif,
             'disabled_reason': self.disabled_reason,
@@ -176,4 +178,37 @@ class Appel(db.Model):
             'appelant_id': self.appelant_id,
             'appele_id': self.appele_id,
             'created_at': self.created_at.isoformat()
+        }
+
+class WhatsAppClick(db.Model):
+    __tablename__ = 'whatsapp_clicks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    cliquant_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=True)
+    cible_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    cliquant = db.relationship('Utilisateur', foreign_keys=[cliquant_id], lazy=True)
+    cible = db.relationship('Utilisateur', foreign_keys=[cible_id], lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'cliquant_id': self.cliquant_id,
+            'cible_id': self.cible_id,
+            'created_at': self.created_at.isoformat()
+        }
+
+class WhatsAppSetting(db.Model):
+    __tablename__ = 'whatsapp_settings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    default_message = db.Column(db.Text, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'default_message': self.default_message,
+            'updated_at': self.updated_at.isoformat()
         }
