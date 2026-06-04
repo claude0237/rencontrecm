@@ -55,6 +55,11 @@
         .animate-marquee {
             animation: marquee 30s linear infinite;
         }
+
+        .scroll-container {
+            overflow-x: auto;
+            scroll-behavior: smooth;
+        }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -80,7 +85,7 @@
         }
     }
 }">
-    <nav class="bg-charcoal text-cream shadow-lg">
+    <nav class="bg-charcoal text-cream shadow-lg fixed w-full top-0 left-0 z-50">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex justify-between items-center h-16">
                 <a href="/" class="text-2xl font-bold text-rose">RencontresCM</a>
@@ -90,6 +95,7 @@
                     <a href="/" class="hover:text-rose transition">Accueil</a>
                     {% if session.get('user_id') %}
                         <a href="/profil" class="hover:text-rose transition">Profil</a>
+                        <a href="/mes-pubs" class="hover:text-rose transition">Mes Publicités</a>
                         {% if session.get('is_admin') %}
                             <a href="/admin/dashboard" class="hover:text-rose transition">Admin</a>
                         {% endif %}
@@ -122,6 +128,7 @@
                     <a href="/" @click="mobileMenuOpen = false" class="hover:text-rose transition py-2">Accueil</a>
                     {% if session.get('user_id') %}
                         <a href="/profil" @click="mobileMenuOpen = false" class="hover:text-rose transition py-2">Profil</a>
+                        <a href="/mes-pubs" @click="mobileMenuOpen = false" class="hover:text-rose transition py-2">Mes Publicités</a>
                         {% if session.get('is_admin') %}
                             <a href="/admin/dashboard" @click="mobileMenuOpen = false" class="hover:text-rose transition py-2">Admin</a>
                         {% endif %}
@@ -134,8 +141,8 @@
         </div>
     </nav>
 
-    <div x-show="alertes.length > 0" class="bg-rose text-white py-2 px-4 text-center overflow-hidden max-w-4xl mx-auto my-2 rounded-lg" x-cloak>
-        <div class="relative h-8 overflow-hidden">
+    <div class="bg-rose text-white py-2 px-4 text-center overflow-hidden max-w-6xl mx-auto mt-16 mb-2 rounded-lg" x-cloak>
+        <div class="relative h-8 overflow-hidden" x-init="$el.scrollLeft = 0; setInterval(() => { if ($el.scrollWidth > $el.clientWidth) { $el.scrollLeft += 0.3; if ($el.scrollLeft >= $el.scrollWidth - $el.clientWidth) { $el.scrollLeft = 0; } } }, 50)">
             <template x-for="(alerte, index) in alertes" :key="alerte.id">
                 <div x-show="index === currentAlertIndex"
                      x-transition:enter="transition ease-out duration-500"
@@ -145,14 +152,14 @@
                      x-transition:leave-start="opacity-100 transform translate-x-0"
                      x-transition:leave-end="opacity-0 transform -translate-x-full"
                      class="absolute inset-0 w-full flex items-center justify-center whitespace-nowrap">
-                    <span x-text="alerte.message" class="inline-block font-bold text-[16px] animate-marquee"></span>
+                    <span x-text="alerte.message" class="inline-block font-bold text-[16px]"></span>
                 </div>
             </template>
             <div x-show="alertes.length === 0" class="h-6"></div>
         </div>
     </div>
 
-    <main class="max-w-7xl mx-auto px-4 py-8 overflow-x-auto">
+    <main class="max-w-7xl mx-auto px-4 py-8 pt-20 overflow-x-auto">
         {% block content %}{% endblock %}
     </main>
 

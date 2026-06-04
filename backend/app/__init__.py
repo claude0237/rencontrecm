@@ -18,10 +18,12 @@ def create_app(config_class=Config):
     from app.routes.auth import auth_bp
     from app.routes.members import members_bp
     from app.routes.admin import admin_bp
+    from app.routes.ads import ads_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')
     app.register_blueprint(members_bp, url_prefix='/api/v1')
     app.register_blueprint(admin_bp, url_prefix='/api/v1/admin')
+    app.register_blueprint(ads_bp, url_prefix='/api/v1/ads')
     
     @app.route('/')
     def index():
@@ -64,6 +66,27 @@ def create_app(config_class=Config):
         if 'user_id' not in session:
             return render_template('auth/login.html')
         return render_template('main/profil.html')
+    
+    @app.route('/mes-pubs')
+    def mes_pubs():
+        from flask import render_template, session, redirect
+        if 'user_id' not in session:
+            return redirect('/login')
+        return render_template('main/mes_pubs.html')
+    
+    @app.route('/creer-pub')
+    def creer_pub():
+        from flask import render_template, session, redirect
+        if 'user_id' not in session:
+            return redirect('/login')
+        return render_template('main/creer_pub.html')
+    
+    @app.route('/modifier-pub/<int:ad_id>')
+    def modifier_pub(ad_id):
+        from flask import render_template, session, redirect
+        if 'user_id' not in session:
+            return redirect('/login')
+        return render_template('main/modifier_pub.html')
     
     @app.route('/admin/dashboard')
     def admin_dashboard():
@@ -108,6 +131,33 @@ def create_app(config_class=Config):
         if not user or not user.est_admin:
             return redirect('/')
         return render_template('admin/alertes.html')
+    
+    @app.route('/admin/publicites')
+    def admin_publicites():
+        from flask import render_template, session, redirect
+        if 'user_id' not in session:
+            return redirect('/login')
+        from app.models import Utilisateur
+        user = Utilisateur.query.get(session['user_id'])
+        if not user or not user.est_admin:
+            return redirect('/')
+        return render_template('admin/publicites.html')
+    
+    @app.route('/admin/packs')
+    def admin_packs():
+        from flask import render_template, session, redirect
+        if 'user_id' not in session:
+            return redirect('/login')
+        from app.models import Utilisateur
+        user = Utilisateur.query.get(session['user_id'])
+        if not user or not user.est_admin:
+            return redirect('/')
+        return render_template('admin/packs.html')
+    
+    @app.route('/pub/<int:ad_id>')
+    def pub_details(ad_id):
+        from flask import render_template
+        return render_template('main/pub_details.html')
     
     @app.route('/logout')
     def logout():

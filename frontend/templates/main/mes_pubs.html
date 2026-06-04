@@ -1,0 +1,142 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Mes Publicités - RencontreCm{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-screen">
+    <div class="flex-1 overflow-y-auto">
+        <div class="max-w-6xl mx-auto px-4 py-8">
+            <h1 class="text-4xl font-bold text-rose mb-8">Mes Publicités</h1>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6" x-data="{ 
+                advertisements: [],
+                loading: true,
+                init() {
+                    this.loadAdvertisements();
+                },
+                loadAdvertisements() {
+                    this.loading = true;
+                    fetch('/api/v1/ads/mes-pubs')
+                        .then(r => r.json())
+                        .then(data => {
+                            this.advertisements = data.advertisements;
+                            this.loading = false;
+                        })
+                        .catch(err => {
+                            console.error('Error loading advertisements:', err);
+                            this.loading = false;
+                        });
+                },
+                getStatusColor(status) {
+                    const colors = {
+                        'brouillon': 'bg-gray-100 text-gray-800',
+                        'en_attente': 'bg-yellow-100 text-yellow-800',
+                        'validee': 'bg-green-100 text-green-800',
+                        'rejetee': 'bg-red-100 text-red-800',
+                        'expiree': 'bg-purple-100 text-purple-800'
+                    };
+                    return colors[status] || 'bg-gray-100 text-gray-800';
+                },
+                getStatusLabel(status) {
+                    const labels = {
+                        'brouillon': 'Brouillon',
+                        'en_attente': 'En attente',
+                        'validee': 'Validée',
+                        'rejetee': 'Rejetée',
+                        'expiree': 'Expirée'
+                    };
+                    return labels[status] || status;
+                },
+                deleteAd(ad) {
+                    if (!confirm('Voulez-vous vraiment supprimer cette publicité?')) return;
+                    
+                    fetch(`/api/v1/ads/pub/${ad.id}`, {
+                        method: 'DELETE'
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            this.advertisements = this.advertisements.filter(a => a.id !== ad.id);
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error deleting ad:', err);
+                        alert('Erreur lors de la suppression');
+                    });
+                },
+                renewAd(ad) {
+                    if (!confirm('Voulez-vous vraiment renouveler cette publicité?')) return;
+                    
+                    fetch(`/api/v1/ads/pub/${ad.id}/renouveler`, {
+                        method: 'POST'
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            this.loadAdvertisements();
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error renewing ad:', err);
+                        alert('Erreur lors du renouvellement');
+                    });
+                }
+            }" x-init="init()">
+                <div class="mb-4">
+                    <a href="/creer-pub" class="bg-rose text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-dark transition inline-block">
+                        + Créer une publicité
+                    </a>
+                </div>
+                
+                <div x-show="loading" class="text-center py-8 text-gray-500">
+                    Chargement...
+                </div>
+                
+                <div x-show="!loading" class="max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+                    <div x-show="advertisements.length === 0" class="text-center py-8 text-gray-500">
+                        Aucune publicité créée
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <template x-for="ad in advertisements" :key="ad.id">
+                            <div class="border rounded-lg p-4 hover:bg-gray-50 transition">
+                                <div class="flex items-start gap-4">
+                                    <div x-show="ad.image_url" class="w-32 h-32 flex-shrink-0">
+                                        <img :src="ad.image_url" :alt="ad.titre" class="w-full h-full object-cover rounded-lg">
+                                    </div>
+                                    <div class="flex-1">
+                                        <h3 class="text-xl font-bold text-charcoal mb-2" x-text="ad.titre"></h3>
+                                        <p class="text-gray-600 mb-2" x-text="ad.description"></p>
+                                        <div class="flex items-center gap-4 mb-2 text-sm text-gray-500">
+                                            <span x-show="ad.numero_contact">📞 <span x-text="ad.numero_contact"></span></span>
+                                            <span x-show="ad.whatsapp">💬 <span x-text="ad.whatsapp"></span></span>
+                                            <span x-show="ad.pack_nom">📦 <span x-text="ad.pack_nom"></span> - <span x-text="ad.pack_prix + ' FCFA'"></span></span>
+                                        </div>
+                                        <div class="flex items-center gap-4 text-sm text-gray-500">
+                                            <span>Créée le: <span x-text="new Date(ad.date_creation).toLocaleDateString('fr-FR')"></span></span>
+                                            <span x-show="ad.date_debut_validite">Début: <span x-text="new Date(ad.date_debut_validite).toLocaleDateString('fr-FR')"></span></span>
+                                            <span x-show="ad.date_fin_validite">Fin: <span x-text="new Date(ad.date_fin_validite).toLocaleDateString('fr-FR')"></span></span>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-col gap-2">
+                                        <span :class="getStatusColor(ad.statut)" class="px-3 py-1 rounded-full text-sm font-semibold text-center" x-text="getStatusLabel(ad.statut)"></span>
+                                        <div class="flex gap-2 mt-2">
+                                            <a :href="`/modifier-pub/${ad.id}`" x-show="ad.statut === 'brouillon' || ad.statut === 'en_attente'" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition text-center">Modifier</a>
+                                            <button @click="deleteAd(ad)" x-show="ad.statut === 'brouillon' || ad.statut === 'en_attente'" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition">Supprimer</button>
+                                            <button @click="renewAd(ad)" x-show="ad.statut === 'expiree'" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition">Renouveler</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

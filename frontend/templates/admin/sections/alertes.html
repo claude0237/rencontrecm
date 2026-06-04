@@ -181,7 +181,7 @@
         </form>
     </div>
     
-    <div class="space-y-4 max-h-96 overflow-y-auto">
+    <div class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-rose scrollbar-track-gray-200">
         <template x-for="alerte in alertes" :key="alerte.id">
             <div class="p-4 border rounded-lg" :class="alerte.active ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-300'">
                 <div class="flex items-start justify-between">

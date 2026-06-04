@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 from app import db
-from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel, WhatsAppClick, WhatsAppSetting
+from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel, WhatsAppClick, WhatsAppSetting, Advertisement, AdPack, AdValidationHistory, AdminNotification
 from app.utils import admin_required
+from datetime import datetime, timedelta
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -418,3 +419,295 @@ def update_whatsapp_setting():
     db.session.commit()
     
     return jsonify({'message': 'Message WhatsApp mis à jour', 'setting': setting.to_dict()}), 200
+
+# Advertisement management
+@admin_bp.route('/publicites', methods=['GET'])
+@admin_required
+def get_all_advertisements():
+    """Get all advertisements for admin management"""
+    ads = Advertisement.query.order_by(Advertisement.date_creation.desc()).all()
+    
+    return jsonify({
+        'advertisements': [
+            {
+                **ad.to_dict(),
+                'annonceur_nom': ad.utilisateur.nom if ad.utilisateur else None,
+                'annonceur_email': ad.utilisateur.email if ad.utilisateur else None,
+                'annonceur_telephone': ad.utilisateur.contact_direct if ad.utilisateur else None
+            }
+            for ad in ads
+        ]
+    }), 200
+
+@admin_bp.route('/publicites/en-attente', methods=['GET'])
+@admin_required
+def get_pending_advertisements():
+    """Get all pending advertisements"""
+    ads = Advertisement.query.filter_by(statut='en_attente').order_by(Advertisement.date_creation.desc()).all()
+    
+    return jsonify({
+        'advertisements': [
+            {
+                **ad.to_dict(),
+                'annonceur_nom': ad.utilisateur.nom if ad.utilisateur else None,
+                'annonceur_email': ad.utilisateur.email if ad.utilisateur else None,
+                'annonceur_telephone': ad.utilisateur.contact_direct if ad.utilisateur else None
+            }
+            for ad in ads
+        ]
+    }), 200
+
+@admin_bp.route('/publicite/<int:ad_id>/valider', methods=['POST'])
+@admin_required
+def validate_advertisement(ad_id):
+    """Validate an advertisement"""
+    ad = Advertisement.query.get_or_404(ad_id)
+    
+    if ad.statut != 'en_attente':
+        return jsonify({'error': 'Cette publicité n\'est pas en attente'}), 400
+    
+    # Set validation dates
+    ad.statut = 'validee'
+    ad.date_debut_validite = datetime.utcnow()
+    ad.date_fin_validite = datetime.utcnow() + timedelta(days=ad.duree_jours)
+    
+    # Log validation
+    from flask import session
+    history = AdValidationHistory(
+        advertisement_id=ad.id,
+        admin_id=session['user_id'],
+        action='validee'
+    )
+    db.session.add(history)
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Publicité validée', 'advertisement': ad.to_dict()}), 200
+
+@admin_bp.route('/publicite/<int:ad_id>/rejeter', methods=['POST'])
+@admin_required
+def reject_advertisement(ad_id):
+    """Reject an advertisement with reason"""
+    data = request.get_json()
+    
+    if not data or 'motif' not in data:
+        return jsonify({'error': 'Motif de rejet requis'}), 400
+    
+    ad = Advertisement.query.get_or_404(ad_id)
+    
+    if ad.statut != 'en_attente':
+        return jsonify({'error': 'Cette publicité n\'est pas en attente'}), 400
+    
+    # Update status
+    ad.statut = 'rejetee'
+    
+    # Log rejection
+    from flask import session
+    history = AdValidationHistory(
+        advertisement_id=ad.id,
+        admin_id=session['user_id'],
+        action='rejetee',
+        motif_rejet=data['motif']
+    )
+    db.session.add(history)
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Publicité rejetée', 'advertisement': ad.to_dict()}), 200
+
+@admin_bp.route('/publicite/<int:ad_id>/suspendre', methods=['POST'])
+@admin_required
+def suspend_advertisement(ad_id):
+    """Suspend an advertisement"""
+    ad = Advertisement.query.get_or_404(ad_id)
+    
+    if ad.statut != 'validee':
+        return jsonify({'error': 'Seules les publicités validées peuvent être suspendues'}), 400
+    
+    # Update status
+    ad.statut = 'suspendue'
+    
+    # Log suspension
+    from flask import session
+    history = AdValidationHistory(
+        advertisement_id=ad.id,
+        admin_id=session['user_id'],
+        action='suspendue'
+    )
+    db.session.add(history)
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Publicité suspendue', 'advertisement': ad.to_dict()}), 200
+
+@admin_bp.route('/publicite/<int:ad_id>/reactiver', methods=['POST'])
+@admin_required
+def reactivate_advertisement(ad_id):
+    """Reactivate a suspended advertisement"""
+    ad = Advertisement.query.get_or_404(ad_id)
+    
+    if ad.statut != 'suspendue':
+        return jsonify({'error': 'Seules les publicités suspendues peuvent être réactivées'}), 400
+    
+    # Update status
+    ad.statut = 'validee'
+    
+    # Update end date
+    ad.date_fin_validite = datetime.utcnow() + timedelta(days=ad.duree_jours)
+    
+    # Log reactivation
+    from flask import session
+    history = AdValidationHistory(
+        advertisement_id=ad.id,
+        admin_id=session['user_id'],
+        action='validee'
+    )
+    db.session.add(history)
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Publicité réactivée', 'advertisement': ad.to_dict()}), 200
+
+@admin_bp.route('/publicite/<int:ad_id>/supprimer', methods=['DELETE'])
+@admin_required
+def delete_advertisement(ad_id):
+    """Delete a suspended or rejected advertisement"""
+    ad = Advertisement.query.get_or_404(ad_id)
+    
+    if ad.statut not in ['suspendue', 'rejetee']:
+        return jsonify({'error': 'Seules les publicités suspendues ou rejetées peuvent être supprimées'}), 400
+    
+    # Delete image file if exists
+    if ad.image_url:
+        try:
+            import os
+            image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '../../frontend', ad.image_url.lstrip('/'))
+            if os.path.exists(image_path):
+                os.remove(image_path)
+        except Exception as e:
+            print(f"Error deleting image file: {e}")
+    
+    # Delete advertisement
+    db.session.delete(ad)
+    db.session.commit()
+    
+    return jsonify({'message': 'Publicité supprimée'}), 200
+
+
+@admin_bp.route('/publicite/<int:ad_id>/historique', methods=['GET'])
+@admin_required
+def get_ad_history(ad_id):
+    """Get validation history for an advertisement"""
+    ad = Advertisement.query.get_or_404(ad_id)
+    history = AdValidationHistory.query.filter_by(advertisement_id=ad_id).order_by(AdValidationHistory.created_at.desc()).all()
+    
+    return jsonify({
+        'history': [h.to_dict() for h in history]
+    }), 200
+
+# Ad pack management
+@admin_bp.route('/packs', methods=['GET'])
+@admin_required
+def get_ad_packs():
+    """Get all ad packs"""
+    packs = AdPack.query.all()
+    
+    return jsonify({
+        'packs': [pack.to_dict() for pack in packs]
+    }), 200
+
+@admin_bp.route('/pack', methods=['POST'])
+@admin_required
+def create_ad_pack():
+    """Create a new ad pack"""
+    data = request.get_json()
+    
+    if not data or 'nom' not in data or 'prix' not in data or 'duree_jours' not in data:
+        return jsonify({'error': 'Nom, prix et durée requis'}), 400
+    
+    pack = AdPack(
+        nom=data['nom'],
+        description=data.get('description'),
+        prix=data['prix'],
+        duree_jours=data['duree_jours'],
+        actif=data.get('actif', True)
+    )
+    
+    db.session.add(pack)
+    db.session.commit()
+    
+    return jsonify({'message': 'Pack créé', 'pack': pack.to_dict()}), 201
+
+@admin_bp.route('/pack/<int:pack_id>', methods=['PUT'])
+@admin_required
+def update_ad_pack(pack_id):
+    """Update an ad pack"""
+    pack = AdPack.query.get_or_404(pack_id)
+    data = request.get_json()
+    
+    if 'nom' in data:
+        pack.nom = data['nom']
+    if 'description' in data:
+        pack.description = data['description']
+    if 'prix' in data:
+        pack.prix = data['prix']
+    if 'duree_jours' in data:
+        pack.duree_jours = data['duree_jours']
+    if 'actif' in data:
+        pack.actif = data['actif']
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Pack mis à jour', 'pack': pack.to_dict()}), 200
+
+@admin_bp.route('/pack/<int:pack_id>', methods=['DELETE'])
+@admin_required
+def delete_ad_pack(pack_id):
+    """Delete an ad pack"""
+    pack = AdPack.query.get_or_404(pack_id)
+    db.session.delete(pack)
+    db.session.commit()
+    
+    return jsonify({'message': 'Pack supprimé'}), 200
+
+# Admin notifications
+@admin_bp.route('/notifications', methods=['GET'])
+@admin_required
+def get_notifications():
+    """Get all admin notifications"""
+    notifications = AdminNotification.query.order_by(AdminNotification.created_at.desc()).limit(50).all()
+    unread_count = AdminNotification.query.filter_by(lue=False).count()
+    
+    return jsonify({
+        'notifications': [n.to_dict() for n in notifications],
+        'unread_count': unread_count
+    }), 200
+
+@admin_bp.route('/notification/<int:notification_id>/lire', methods=['POST'])
+@admin_required
+def mark_notification_read(notification_id):
+    """Mark a notification as read"""
+    notification = AdminNotification.query.get_or_404(notification_id)
+    notification.lue = True
+    db.session.commit()
+    
+    return jsonify({'message': 'Notification marquée comme lue'}), 200
+
+@admin_bp.route('/notifications/lire-toutes', methods=['POST'])
+@admin_required
+def mark_all_notifications_read():
+    """Mark all notifications as read"""
+    AdminNotification.query.update({'lue': True})
+    db.session.commit()
+    
+    return jsonify({'message': 'Toutes les notifications marquées comme lues'}), 200
+
+@admin_bp.route('/notification/<int:notification_id>', methods=['DELETE'])
+@admin_required
+def delete_notification(notification_id):
+    """Delete a notification"""
+    notification = AdminNotification.query.get_or_404(notification_id)
+    db.session.delete(notification)
+    db.session.commit()
+    
+    return jsonify({'message': 'Notification supprimée'}), 200

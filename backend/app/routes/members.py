@@ -52,6 +52,7 @@ def get_all_quartiers():
 @members_bp.route('/profils', methods=['GET'])
 def get_profils():
     region_id = request.args.get('region_id')
+    quartier_id = request.args.get('quartier_id')
     genre = request.args.get('genre')
     age_min = request.args.get('age_min', type=int)
     age_max = request.args.get('age_max', type=int)
@@ -64,6 +65,9 @@ def get_profils():
     
     if region_id:
         query = query.filter_by(region_id=region_id)
+    
+    if quartier_id:
+        query = query.filter_by(quartier_id=quartier_id)
     
     if genre:
         query = query.filter_by(genre=genre)

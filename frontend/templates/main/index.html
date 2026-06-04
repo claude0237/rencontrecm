@@ -7,10 +7,13 @@
     profils: [],
     recommended: [],
     regions: [],
+    quartiers: [],
+    advertisements: [],
     currentUser: null,
     userLocation: { lat: null, lon: null },
     filters: {
         region_id: '',
+        quartier_id: '',
         genre: '',
         age_min: '',
         age_max: ''
@@ -27,6 +30,7 @@
         this.loadCurrentUser();
         this.loadRegions();
         this.getUserLocation();
+        this.loadAdvertisements();
     },
     loadCurrentUser() {
         fetch('/api/v1/auth/me')
@@ -64,6 +68,7 @@
         this.loading = true;
         const params = new URLSearchParams();
         if (this.filters.region_id) params.append('region_id', this.filters.region_id);
+        if (this.filters.quartier_id) params.append('quartier_id', this.filters.quartier_id);
         if (this.filters.genre) params.append('genre', this.filters.genre);
         if (this.filters.age_min) params.append('age_min', this.filters.age_min);
         if (this.filters.age_max) params.append('age_max', this.filters.age_max);
@@ -103,6 +108,16 @@
             .then(r => r.json())
             .then(data => this.regions = data.regions);
     },
+    loadQuartiers() {
+        if (!this.filters.region_id) {
+            this.quartiers = [];
+            this.filters.quartier_id = '';
+            return;
+        }
+        fetch(`/api/v1/quartiers?region_id=${this.filters.region_id}`)
+            .then(r => r.json())
+            .then(data => this.quartiers = data.quartiers);
+    },
     loadRecommended() {
         const params = new URLSearchParams();
         if (this.userLocation.lat) params.append('lat', this.userLocation.lat);
@@ -114,18 +129,61 @@
             .then(data => {
                 this.recommended = data.profils;
             });
+    },
+    loadAdvertisements() {
+        fetch('/api/v1/ads/pubs')
+            .then(r => r.json())
+            .then(data => {
+                this.advertisements = data.advertisements;
+            })
+            .catch(err => {
+                console.error('Error loading advertisements:', err);
+            });
     }
 }" x-init="init()" class="min-h-screen overflow-x-hidden">
+    <!-- Advertisements Section -->
+    <div x-show="advertisements.length > 0" class="max-w-6xl mx-auto px-4 mb-6">
+        <h2 class="text-xl font-bold text-charcoal mb-3">Publicités</h2>
+        <div class="flex overflow-x-auto gap-2 pb-2 scrollbar-thin scrollbar-thumb-rose scrollbar-track-gray-200" x-init="$el.scrollLeft = 0; setInterval(() => { if ($el.scrollWidth > $el.clientWidth) { $el.scrollLeft += 0.5; if ($el.scrollLeft >= $el.scrollWidth - $el.clientWidth) { $el.scrollLeft = 0; } } }, 50)">
+            <template x-for="ad in advertisements" :key="ad.id">
+                <a :href="'/pub/' + ad.id" class="flex-shrink-0 w-48 bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition block">
+                    <div x-show="ad.image_url" class="h-20 bg-gray-100">
+                        <img :src="ad.image_url" :alt="ad.titre" class="w-full h-full object-cover">
+                    </div>
+                    <div class="p-2">
+                        <h3 class="text-xs font-bold text-charcoal mb-1 truncate" x-text="ad.titre"></h3>
+                        <p class="text-gray-600 text-xs mb-1 line-clamp-1" x-text="ad.description"></p>
+                        <div class="flex items-center gap-1 text-xs text-gray-500">
+                            <span x-show="ad.numero_contact">📞</span>
+                            <span x-show="ad.whatsapp">💬</span>
+                        </div>
+                    </div>
+                </a>
+            </template>
+        </div>
+    </div>
+    
     <!-- Horizontal Filters -->
-    <div class="bg-white rounded-lg shadow-lg p-2 mb-6 max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-2 mb-6 max-w-6xl mx-auto">
         <div class="flex flex-wrap gap-3 items-center">
             <div class="flex-shrink-0">
                 <label class="block text-charcoal font-semibold mb-1 text-xs">Ville</label>
-                <select x-model="filters.region_id" @change="loadProfils()"
+                <select x-model="filters.region_id" @change="loadQuartiers(); loadProfils()"
                     class="px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:border-rose text-sm">
                     <option value="">Toutes les villes</option>
                     <template x-for="region in regions" :key="region.id">
                         <option :value="region.id" x-text="region.nom"></option>
+                    </template>
+                </select>
+            </div>
+            
+            <div class="flex-shrink-0">
+                <label class="block text-charcoal font-semibold mb-1 text-xs">Commune</label>
+                <select x-model="filters.quartier_id" @change="loadProfils()" :disabled="!filters.region_id"
+                    class="px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:border-rose text-sm">
+                    <option value="">Toutes les communes</option>
+                    <template x-for="quartier in quartiers" :key="quartier.id">
+                        <option :value="quartier.id" x-text="quartier.nom"></option>
                     </template>
                 </select>
             </div>
@@ -156,15 +214,13 @@
     
     <!-- Main Content -->
     <main class="overflow-x-hidden">
-            <h1 class="text-4xl font-bold text-rose text-center mb-8">Trouvez votre âme sœur</h1>
-            
             <!-- Recommended Profiles Horizontal Scroll -->
             <div class="max-w-6xl mx-auto px-4 mb-8">
                 <h2 class="text-2xl font-bold text-charcoal mb-4">Profils recommandés</h2>
-                <div class="flex overflow-x-auto gap-4 pb-4 scrollbar-thin scrollbar-thumb-rose scrollbar-track-gray-200">
+                <div class="flex overflow-x-auto gap-3 pb-4 scrollbar-thin scrollbar-thumb-rose scrollbar-track-gray-200">
                     <template x-for="profil in recommended" :key="profil.id">
-                        <div class="flex-shrink-0 w-48 bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition">
-                            <div class="h-32 bg-gradient-to-br from-rose to-rose-light flex items-center justify-center">
+                        <div class="flex-shrink-0 w-40 bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition">
+                            <div class="h-28 bg-gradient-to-br from-rose to-rose-light flex items-center justify-center">
                                 <template x-if="profil.photos && profil.photos.length > 0">
                                     <img :src="profil.photos[0]" :alt="profil.nom" class="w-full h-full object-cover">
                                 </template>
@@ -173,18 +229,18 @@
                                         <img :src="profil.photo_url" :alt="profil.nom" class="w-full h-full object-cover">
                                     </template>
                                     <template x-if="!profil.photo_url">
-                                        <div class="text-white text-3xl font-bold" x-text="profil.nom.charAt(0)"></div>
+                                        <div class="text-white text-2xl font-bold" x-text="profil.nom.charAt(0)"></div>
                                     </template>
                                 </template>
                             </div>
-                            <div class="p-3">
-                                <h3 class="text-lg font-bold text-charcoal truncate" x-text="profil.nom"></h3>
-                                <p class="text-rose font-semibold text-sm" x-text="profil.age + ' ans'"></p>
+                            <div class="p-2">
+                                <h3 class="text-sm font-bold text-charcoal truncate" x-text="profil.nom"></h3>
+                                <p class="text-rose font-semibold text-xs" x-text="profil.age + ' ans'"></p>
                                 <p class="text-gray-600 text-xs truncate" x-text="profil.region_nom"></p>
                                 <template x-if="profil.distance !== null">
                                     <p class="text-green-600 text-xs font-semibold" x-text="profil.distance + ' km'"></p>
                                 </template>
-                                <a :href="'/profil/' + profil.id" class="inline-block mt-2 bg-rose text-white px-3 py-1 rounded-lg hover:bg-rose-dark transition text-sm">Voir</a>
+                                <a :href="'/profil/' + profil.id" class="inline-block mt-1 bg-rose text-white px-2 py-1 rounded hover:bg-rose-dark transition text-xs">Voir</a>
                             </div>
                         </div>
                     </template>

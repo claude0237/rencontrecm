@@ -1,5 +1,101 @@
 <h1 class="text-4xl font-bold text-rose mb-8">Tableau de bord Administrateur</h1>
 
+<!-- Notifications Section -->
+<div class="bg-white rounded-lg shadow-lg p-6 mb-8" x-data="{ 
+    notifications: [],
+    unreadCount: 0,
+    loading: true,
+    init() {
+        this.loadNotifications();
+    },
+    loadNotifications() {
+        this.loading = true;
+        fetch('/api/v1/admin/notifications')
+            .then(r => r.json())
+            .then(data => {
+                this.notifications = data.notifications;
+                this.unreadCount = data.unread_count;
+                this.loading = false;
+            })
+            .catch(err => {
+                console.error('Error loading notifications:', err);
+                this.loading = false;
+            });
+    },
+    markAsRead(notification) {
+        fetch(`/api/v1/admin/notification/${notification.id}/lire`, {
+            method: 'POST'
+        })
+        .then(r => r.json())
+        .then(data => {
+            notification.lue = true;
+            this.unreadCount--;
+        })
+        .catch(err => console.error('Error marking as read:', err));
+    },
+    markAllAsRead() {
+        fetch('/api/v1/admin/notifications/lire-toutes', {
+            method: 'POST'
+        })
+        .then(r => r.json())
+        .then(data => {
+            this.notifications.forEach(n => n.lue = true);
+            this.unreadCount = 0;
+        })
+        .catch(err => console.error('Error marking all as read:', err));
+    },
+    deleteNotification(notification) {
+        if (!confirm('Voulez-vous vraiment supprimer cette notification?')) return;
+        
+        fetch(`/api/v1/admin/notification/${notification.id}`, {
+            method: 'DELETE'
+        })
+        .then(r => r.json())
+        .then(data => {
+            this.notifications = this.notifications.filter(n => n.id !== notification.id);
+            if (!notification.lue) this.unreadCount--;
+        })
+        .catch(err => console.error('Error deleting notification:', err));
+    }
+}" x-init="init()">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-2xl font-bold text-charcoal">Notifications</h2>
+        <div class="flex gap-2">
+            <span x-show="unreadCount > 0" class="bg-rose text-white px-3 py-1 rounded-full text-sm font-semibold" x-text="unreadCount + ' non lue(s)'"></span>
+            <button x-show="unreadCount > 0" @click="markAllAsRead()" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition">Tout marquer comme lu</button>
+        </div>
+    </div>
+    
+    <div x-show="loading" class="text-center py-4 text-gray-500">
+        Chargement...
+    </div>
+    
+    <div x-show="!loading && notifications.length === 0" class="text-center py-4 text-gray-500">
+        Aucune notification
+    </div>
+    
+    <div x-show="!loading && notifications.length > 0" class="space-y-3 max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-rose scrollbar-track-gray-200">
+        <template x-for="notification in notifications" :key="notification.id">
+            <div :class="notification.lue ? 'bg-gray-50' : 'bg-yellow-50 border-l-4 border-yellow-500'" class="p-4 rounded-lg">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span :class="notification.type === 'nouvelle_publicite' ? 'bg-green-100 text-green-800' : notification.type === 'paiement_publicitaire' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'" class="px-2 py-0.5 rounded-full text-xs font-semibold" x-text="notification.type"></span>
+                            <h3 class="font-semibold text-charcoal" x-text="notification.titre"></h3>
+                            <span class="text-xs text-gray-500" x-text="new Date(notification.created_at).toLocaleString('fr-FR')"></span>
+                        </div>
+                        <p class="text-gray-600 text-sm" x-text="notification.message"></p>
+                    </div>
+                    <div class="flex gap-2 ml-4">
+                        <button x-show="!notification.lue" @click="markAsRead(notification)" class="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600 transition">Marquer comme lu</button>
+                        <button @click="deleteNotification(notification)" class="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition">Supprimer</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+
 <!-- Statistics Cards -->
 <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8" x-data="{ stats: null, loading: true }" x-init="
     fetch('/api/v1/admin/statistiques')

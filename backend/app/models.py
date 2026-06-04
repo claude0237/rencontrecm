@@ -212,3 +212,118 @@ class WhatsAppSetting(db.Model):
             'default_message': self.default_message,
             'updated_at': self.updated_at.isoformat()
         }
+
+class AdPack(db.Model):
+    __tablename__ = 'ad_packs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    prix = db.Column(db.Float, nullable=False)
+    duree_jours = db.Column(db.Integer, nullable=False)
+    actif = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nom': self.nom,
+            'description': self.description,
+            'prix': self.prix,
+            'duree_jours': self.duree_jours,
+            'actif': self.actif,
+            'created_at': self.created_at.isoformat()
+        }
+
+class Advertisement(db.Model):
+    __tablename__ = 'advertisements'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
+    titre = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    image_url = db.Column(db.String(500))
+    numero_contact = db.Column(db.String(50))
+    whatsapp = db.Column(db.String(50))
+    duree_jours = db.Column(db.Integer, nullable=False)
+    statut = db.Column(db.String(20), default='brouillon')  # brouillon, en_attente, validee, rejetee, suspendue, expiree
+    pack_id = db.Column(db.Integer, db.ForeignKey('ad_packs.id'))
+    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_debut_validite = db.Column(db.DateTime)
+    date_fin_validite = db.Column(db.DateTime)
+    paiement_effectue = db.Column(db.Boolean, default=False)
+    
+    utilisateur = db.relationship('Utilisateur', backref='advertisements', lazy=True)
+    pack = db.relationship('AdPack', backref='advertisements', lazy=True)
+    validation_history = db.relationship('AdValidationHistory', backref='advertisement', lazy=True, cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'utilisateur_id': self.utilisateur_id,
+            'titre': self.titre,
+            'description': self.description,
+            'image_url': self.image_url,
+            'numero_contact': self.numero_contact,
+            'whatsapp': self.whatsapp,
+            'duree_jours': self.duree_jours,
+            'statut': self.statut,
+            'pack_id': self.pack_id,
+            'pack_nom': self.pack.nom if self.pack else None,
+            'pack_prix': self.pack.prix if self.pack else None,
+            'date_creation': self.date_creation.isoformat(),
+            'date_debut_validite': self.date_debut_validite.isoformat() if self.date_debut_validite else None,
+            'date_fin_validite': self.date_fin_validite.isoformat() if self.date_fin_validite else None,
+            'paiement_effectue': self.paiement_effectue
+        }
+
+class AdValidationHistory(db.Model):
+    __tablename__ = 'ad_validation_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    advertisement_id = db.Column(db.Integer, db.ForeignKey('advertisements.id'), nullable=False)
+    admin_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
+    action = db.Column(db.String(20), nullable=False)  # validee, rejetee, suspendue
+    motif_rejet = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    admin = db.relationship('Utilisateur', backref='ad_validations', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'advertisement_id': self.advertisement_id,
+            'admin_id': self.admin_id,
+            'admin_nom': self.admin.nom if self.admin else None,
+            'action': self.action,
+            'motif_rejet': self.motif_rejet,
+            'created_at': self.created_at.isoformat()
+        }
+
+class AdminNotification(db.Model):
+    __tablename__ = 'admin_notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    type = db.Column(db.String(50), nullable=False)  # nouvelle_publicite, paiement_publicitaire, autre
+    titre = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    advertisement_id = db.Column(db.Integer, db.ForeignKey('advertisements.id'))
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'))
+    lue = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    advertisement = db.relationship('Advertisement', backref='notifications', lazy=True)
+    utilisateur = db.relationship('Utilisateur', backref='notifications', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'type': self.type,
+            'titre': self.titre,
+            'message': self.message,
+            'advertisement_id': self.advertisement_id,
+            'utilisateur_id': self.utilisateur_id,
+            'utilisateur_nom': self.utilisateur.nom if self.utilisateur else None,
+            'lue': self.lue,
+            'created_at': self.created_at.isoformat()
+        }

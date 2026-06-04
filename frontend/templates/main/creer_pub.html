@@ -1,0 +1,253 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Créer une Publicité - RencontreCm{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-4">
+    <h1 class="text-4xl font-bold text-rose mb-8">Créer une Publicité</h1>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6" x-data="{ 
+        packs: [],
+        selectedPack: null,
+        form: {
+            titre: '',
+            description: '',
+            image_url: '',
+            numero_contact: '',
+            whatsapp: '',
+            duree_jours: 7
+        },
+        loading: true,
+        saving: false,
+        uploading: false,
+        init() {
+            this.loadPacks();
+        },
+        loadPacks() {
+            fetch('/api/v1/ads/packs')
+                .then(r => r.json())
+                .then(data => {
+                    this.packs = data.packs;
+                    this.loading = false;
+                })
+                .catch(err => {
+                    console.error('Error loading packs:', err);
+                    this.loading = false;
+                });
+        },
+        selectPack(pack) {
+            this.selectedPack = pack;
+            this.form.duree_jours = pack.duree_jours;
+        },
+        handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            this.uploading = true;
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            fetch('/api/v1/ads/pub/image', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    this.form.image_url = data.image_url;
+                }
+                this.uploading = false;
+            })
+            .catch(err => {
+                console.error('Error uploading image:', err);
+                alert('Erreur lors du téléchargement de l\'image');
+                this.uploading = false;
+            });
+        },
+        saveDraft() {
+            if (!this.form.titre || !this.form.description) {
+                alert('Veuillez remplir le titre et la description');
+                return;
+            }
+            
+            this.saving = true;
+            
+            fetch('/api/v1/ads/pub', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    titre: this.form.titre,
+                    description: this.form.description,
+                    image_url: this.form.image_url,
+                    numero_contact: this.form.numero_contact,
+                    whatsapp: this.form.whatsapp,
+                    duree_jours: this.form.duree_jours,
+                    pack_id: this.selectedPack ? this.selectedPack.id : null
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    alert('Brouillon enregistré avec succès');
+                    window.location.href = '/mes-pubs';
+                }
+                this.saving = false;
+            })
+            .catch(err => {
+                console.error('Error saving draft:', err);
+                alert('Erreur lors de l\'enregistrement');
+                this.saving = false;
+            });
+        },
+        submitAd() {
+            if (!this.form.titre || !this.form.description) {
+                alert('Veuillez remplir le titre et la description');
+                return;
+            }
+            
+            if (!this.selectedPack) {
+                alert('Veuillez sélectionner un pack');
+                return;
+            }
+            
+            this.saving = true;
+            
+            // First create the ad
+            fetch('/api/v1/ads/pub', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    titre: this.form.titre,
+                    description: this.form.description,
+                    image_url: this.form.image_url,
+                    numero_contact: this.form.numero_contact,
+                    whatsapp: this.form.whatsapp,
+                    duree_jours: this.form.duree_jours,
+                    pack_id: this.selectedPack.id
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    this.saving = false;
+                } else {
+                    // Then submit it
+                    fetch(`/api/v1/ads/pub/${data.advertisement.id}/soumettre`, {
+                        method: 'POST'
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            alert('Publicité soumise pour validation. Effectuez le paiement pour l\'activer.');
+                            window.location.href = '/mes-pubs';
+                        }
+                        this.saving = false;
+                    })
+                    .catch(err => {
+                        console.error('Error submitting ad:', err);
+                        alert('Erreur lors de la soumission');
+                        this.saving = false;
+                    });
+                }
+            })
+            .catch(err => {
+                console.error('Error creating ad:', err);
+                alert('Erreur lors de la création');
+                this.saving = false;
+            });
+        }
+    }" x-init="init()">
+        <div x-show="loading" class="text-center py-8 text-gray-500">
+            Chargement des packs...
+        </div>
+        
+        <div x-show="!loading">
+            <!-- Pack Selection -->
+            <div class="mb-6">
+                <h2 class="text-xl font-bold text-charcoal mb-4">Sélectionnez un pack publicitaire</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <template x-for="pack in packs" :key="pack.id">
+                        <div @click="selectPack(pack)" 
+                             :class="selectedPack && selectedPack.id === pack.id ? 'border-rose bg-rose-50' : 'border-gray-300'"
+                             class="border-2 rounded-lg p-4 cursor-pointer hover:border-rose transition">
+                            <h3 class="text-lg font-bold text-charcoal mb-2" x-text="pack.nom"></h3>
+                            <p class="text-gray-600 mb-2" x-text="pack.description"></p>
+                            <p class="text-2xl font-bold text-rose" x-text="pack.prix + ' FCFA'"></p>
+                            <p class="text-sm text-gray-500" x-text="pack.duree_jours + ' jours'"></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            
+            <!-- Ad Form -->
+            <form @submit.prevent="submitAd()">
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Titre *</label>
+                    <input type="text" x-model="form.titre" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"
+                           placeholder="Titre de votre publicité">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Description *</label>
+                    <textarea x-model="form.description" required rows="4"
+                              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"
+                              placeholder="Décrivez votre produit ou service"></textarea>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Image</label>
+                    <input type="file" @change="handleImageUpload($event)" accept="image/*"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                    <div x-show="uploading" class="mt-2 text-sm text-gray-500">Téléchargement...</div>
+                    <div x-show="form.image_url" class="mt-2">
+                        <img :src="form.image_url" alt="Preview" class="w-32 h-32 object-cover rounded-lg">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-charcoal mb-2">Numéro de contact</label>
+                        <input type="text" x-model="form.numero_contact"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"
+                               placeholder="+237 6XX XXX XXX">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-charcoal mb-2">WhatsApp</label>
+                        <input type="text" x-model="form.whatsapp"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"
+                               placeholder="+237 6XX XXX XXX">
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Durée souhaitée</label>
+                    <input type="number" x-model="form.duree_jours" min="1" max="90"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"
+                           placeholder="Nombre de jours">
+                </div>
+                
+                <div class="flex gap-4">
+                    <button type="button" @click="saveDraft()" :disabled="saving"
+                            class="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition disabled:opacity-50">
+                        <span x-show="!saving">Enregistrer comme brouillon</span>
+                        <span x-show="saving">Enregistrement...</span>
+                    </button>
+                    <button type="submit" :disabled="saving"
+                            class="bg-rose text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-dark transition disabled:opacity-50">
+                        <span x-show="!saving">Soumettre pour validation</span>
+                        <span x-show="saving">Soumission...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

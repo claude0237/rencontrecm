@@ -1,0 +1,241 @@
+<div x-data="{ 
+    packs: [],
+    loading: true,
+    showEditModal: false,
+    showCreateModal: false,
+    editingPack: null,
+    newPack: {
+        nom: '',
+        description: '',
+        prix: '',
+        duree_jours: '',
+        actif: true
+    },
+    init() {
+        this.loadPacks();
+    },
+    loadPacks() {
+        this.loading = true;
+        fetch('/api/v1/admin/packs')
+            .then(r => r.json())
+            .then(data => {
+                this.packs = data.packs;
+                this.loading = false;
+            })
+            .catch(err => {
+                console.error('Error loading packs:', err);
+                this.loading = false;
+            });
+    },
+    openCreateModal() {
+        this.showCreateModal = true;
+        this.newPack = {
+            nom: '',
+            description: '',
+            prix: '',
+            duree_jours: '',
+            actif: true
+        };
+    },
+    createPack() {
+        if (!this.newPack.nom || !this.newPack.prix || !this.newPack.duree_jours) {
+            alert('Veuillez remplir tous les champs requis');
+            return;
+        }
+        
+        fetch('/api/v1/admin/pack', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.newPack)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                this.showCreateModal = false;
+                this.loadPacks();
+            }
+        })
+        .catch(err => {
+            console.error('Error creating pack:', err);
+            alert('Erreur lors de la création');
+        });
+    },
+    openEditModal(pack) {
+        this.editingPack = pack;
+        this.showEditModal = true;
+    },
+    updatePack() {
+        if (!this.editingPack.nom || !this.editingPack.prix || !this.editingPack.duree_jours) {
+            alert('Veuillez remplir tous les champs requis');
+            return;
+        }
+        
+        fetch(`/api/v1/admin/pack/${this.editingPack.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.editingPack)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                this.showEditModal = false;
+                this.loadPacks();
+            }
+        })
+        .catch(err => {
+            console.error('Error updating pack:', err);
+            alert('Erreur lors de la mise à jour');
+        });
+    },
+    deletePack(pack) {
+        if (!confirm('Voulez-vous vraiment supprimer ce pack?')) return;
+        
+        fetch(`/api/v1/admin/pack/${pack.id}`, {
+            method: 'DELETE'
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                this.loadPacks();
+            }
+        })
+        .catch(err => {
+            console.error('Error deleting pack:', err);
+            alert('Erreur lors de la suppression');
+        });
+    },
+    togglePackStatus(pack) {
+        fetch(`/api/v1/admin/pack/${pack.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ actif: !pack.actif })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                pack.actif = !pack.actif;
+            }
+        })
+        .catch(err => {
+            console.error('Error toggling pack status:', err);
+            alert('Erreur lors de la modification');
+        });
+    }
+}">
+    <h1 class="text-4xl font-bold text-rose mb-8">Gestion des Packs Publicitaires</h1>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <button @click="openCreateModal()" class="bg-rose text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-dark transition">
+            + Créer un pack
+        </button>
+    </div>
+    
+    <div x-show="loading" class="text-center py-8 text-gray-500">
+        Chargement...
+    </div>
+    
+    <div x-show="!loading" class="space-y-4">
+        <template x-for="pack in packs" :key="pack.id">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                            <h3 class="text-xl font-bold text-charcoal" x-text="pack.nom"></h3>
+                            <span :class="pack.actif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" class="px-3 py-1 rounded-full text-sm font-semibold" x-text="pack.actif ? 'Actif' : 'Inactif'"></span>
+                        </div>
+                        <p class="text-gray-600 mb-2" x-text="pack.description"></p>
+                        <div class="flex items-center gap-4 text-sm text-gray-500">
+                            <span class="font-semibold">Prix:</span>
+                            <span x-text="pack.prix + ' FCFA'"></span>
+                            <span class="font-semibold">Durée:</span>
+                            <span x-text="pack.duree_jours + ' jours'"></span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="togglePackStatus(pack)" :class="pack.actif ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-500 hover:bg-green-600'" class="text-white px-3 py-1 rounded text-sm transition" x-text="pack.actif ? 'Désactiver' : 'Activer'"></button>
+                        <button @click="openEditModal(pack)" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition">Modifier</button>
+                        <button @click="deletePack(pack)" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition">Supprimer</button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+    
+    <!-- Create Modal -->
+    <div x-show="showCreateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-charcoal mb-4">Créer un pack</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Nom *</label>
+                    <input type="text" x-model="newPack.nom" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Description</label>
+                    <textarea x-model="newPack.description" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Prix (FCFA) *</label>
+                    <input type="number" x-model="newPack.prix" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Durée (jours) *</label>
+                    <input type="number" x-model="newPack.duree_jours" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                </div>
+                <div>
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" x-model="newPack.actif" class="rounded">
+                        <span class="text-sm text-charcoal">Actif</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex gap-4 mt-6">
+                <button @click="showCreateModal = false" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition">Annuler</button>
+                <button @click="createPack()" class="bg-rose text-white px-4 py-2 rounded-lg hover:bg-rose-dark transition">Créer</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Modal -->
+    <div x-show="showEditModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-charcoal mb-4">Modifier le pack</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Nom *</label>
+                    <input type="text" x-model="editingPack.nom" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Description</label>
+                    <textarea x-model="editingPack.description" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Prix (FCFA) *</label>
+                    <input type="number" x-model="editingPack.prix" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Durée (jours) *</label>
+                    <input type="number" x-model="editingPack.duree_jours" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                </div>
+                <div>
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" x-model="editingPack.actif" class="rounded">
+                        <span class="text-sm text-charcoal">Actif</span>
+                    </label>
+                </div>
+            </div>
+            <div class="flex gap-4 mt-6">
+                <button @click="showEditModal = false" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition">Annuler</button>
+                <button @click="updatePack()" class="bg-rose text-white px-4 py-2 rounded-lg hover:bg-rose-dark transition">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>

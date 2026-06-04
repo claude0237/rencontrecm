@@ -98,26 +98,60 @@
                         class="w-full text-left px-4 py-3 rounded-lg transition">
                         📢 Alertes
                     </button>
-                    <button @click="activeSection = 'comptes-desactives'" 
-                        :class="activeSection === 'comptes-desactives' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
-                        class="w-full text-left px-4 py-3 rounded-lg transition">
-                        🔒 Comptes Désactivés
-                    </button>
-                    <button @click="activeSection = 'statistiques-appels'" 
-                        :class="activeSection === 'statistiques-appels' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
-                        class="w-full text-left px-4 py-3 rounded-lg transition">
-                        📞 Statistiques Appels
-                    </button>
-                    <button @click="activeSection = 'statistiques-visites'" 
-                        :class="activeSection === 'statistiques-visites' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
-                        class="w-full text-left px-4 py-3 rounded-lg transition">
-                        👁️ Statistiques Visites
-                    </button>
-                    <button @click="activeSection = 'statistiques-whatsapp'" 
-                        :class="activeSection === 'statistiques-whatsapp' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
-                        class="w-full text-left px-4 py-3 rounded-lg transition">
-                        💬 Statistiques WhatsApp
-                    </button>
+                    
+                    <!-- Statistiques Submenu -->
+                    <div x-data="{ open: false }">
+                        <button @click="open = !open" 
+                            :class="open ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                            class="w-full text-left px-4 py-3 rounded-lg transition flex items-center justify-between">
+                            <span>📊 Statistiques</span>
+                            <span x-text="open ? '▼' : '▶'"></span>
+                        </button>
+                        <div x-show="open" x-transition class="pl-4 mt-2 space-y-2">
+                            <button @click="activeSection = 'comptes-desactives'; open = false" 
+                                :class="activeSection === 'comptes-desactives' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                🔒 Comptes Désactivés
+                            </button>
+                            <button @click="activeSection = 'statistiques-appels'; open = false" 
+                                :class="activeSection === 'statistiques-appels' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                📞 Statistiques Appels
+                            </button>
+                            <button @click="activeSection = 'statistiques-visites'; open = false" 
+                                :class="activeSection === 'statistiques-visites' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                👁️ Statistiques Visites
+                            </button>
+                            <button @click="activeSection = 'statistiques-whatsapp'; open = false" 
+                                :class="activeSection === 'statistiques-whatsapp' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                💬 Statistiques WhatsApp
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Gestion de Pub Submenu -->
+                    <div x-data="{ open: false }">
+                        <button @click="open = !open" 
+                            :class="open ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                            class="w-full text-left px-4 py-3 rounded-lg transition flex items-center justify-between">
+                            <span>📢 Gestion de Pub</span>
+                            <span x-text="open ? '▼' : '▶'"></span>
+                        </button>
+                        <div x-show="open" x-transition class="pl-4 mt-2 space-y-2">
+                            <button @click="activeSection = 'publicites'; open = false" 
+                                :class="activeSection === 'publicites' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                📢 Publicités
+                            </button>
+                            <button @click="activeSection = 'packs'; open = false" 
+                                :class="activeSection === 'packs' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                📦 Packs Publicitaires
+                            </button>
+                        </div>
+                    </div>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -166,26 +200,60 @@
                         class="w-full text-left px-4 py-3 rounded-lg transition">
                         📢 Alertes
                     </button>
-                    <button @click="activeSection = 'comptes-desactives'; sidebarOpen = false" 
-                        :class="activeSection === 'comptes-desactives' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
-                        class="w-full text-left px-4 py-3 rounded-lg transition">
-                        🔒 Comptes Désactivés
-                    </button>
-                    <button @click="activeSection = 'statistiques-appels'; sidebarOpen = false" 
-                        :class="activeSection === 'statistiques-appels' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
-                        class="w-full text-left px-4 py-3 rounded-lg transition">
-                        📞 Statistiques Appels
-                    </button>
-                    <button @click="activeSection = 'statistiques-visites'; sidebarOpen = false" 
-                        :class="activeSection === 'statistiques-visites' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
-                        class="w-full text-left px-4 py-3 rounded-lg transition">
-                        👁️ Statistiques Visites
-                    </button>
-                    <button @click="activeSection = 'statistiques-whatsapp'; sidebarOpen = false" 
-                        :class="activeSection === 'statistiques-whatsapp' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
-                        class="w-full text-left px-4 py-3 rounded-lg transition">
-                        💬 Statistiques WhatsApp
-                    </button>
+                    
+                    <!-- Statistiques Submenu -->
+                    <div x-data="{ open: false }">
+                        <button @click="open = !open" 
+                            :class="open ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                            class="w-full text-left px-4 py-3 rounded-lg transition flex items-center justify-between">
+                            <span>📊 Statistiques</span>
+                            <span x-text="open ? '▼' : '▶'"></span>
+                        </button>
+                        <div x-show="open" x-transition class="pl-4 mt-2 space-y-2">
+                            <button @click="activeSection = 'comptes-desactives'; sidebarOpen = false; open = false" 
+                                :class="activeSection === 'comptes-desactives' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                🔒 Comptes Désactivés
+                            </button>
+                            <button @click="activeSection = 'statistiques-appels'; sidebarOpen = false; open = false" 
+                                :class="activeSection === 'statistiques-appels' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                📞 Statistiques Appels
+                            </button>
+                            <button @click="activeSection = 'statistiques-visites'; sidebarOpen = false; open = false" 
+                                :class="activeSection === 'statistiques-visites' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                👁️ Statistiques Visites
+                            </button>
+                            <button @click="activeSection = 'statistiques-whatsapp'; sidebarOpen = false; open = false" 
+                                :class="activeSection === 'statistiques-whatsapp' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                💬 Statistiques WhatsApp
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Gestion de Pub Submenu -->
+                    <div x-data="{ open: false }">
+                        <button @click="open = !open" 
+                            :class="open ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                            class="w-full text-left px-4 py-3 rounded-lg transition flex items-center justify-between">
+                            <span>📢 Gestion de Pub</span>
+                            <span x-text="open ? '▼' : '▶'"></span>
+                        </button>
+                        <div x-show="open" x-transition class="pl-4 mt-2 space-y-2">
+                            <button @click="activeSection = 'publicites'; sidebarOpen = false; open = false" 
+                                :class="activeSection === 'publicites' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                📢 Publicités
+                            </button>
+                            <button @click="activeSection = 'packs'; sidebarOpen = false; open = false" 
+                                :class="activeSection === 'packs' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                📦 Packs Publicitaires
+                            </button>
+                        </div>
+                    </div>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -233,6 +301,16 @@
             <!-- Statistiques WhatsApp Section -->
             <div x-show="activeSection === 'statistiques-whatsapp'" x-transition>
                 {% include 'admin/statistiques_whatsapp.html' %}
+            </div>
+            
+            <!-- Publicités Section -->
+            <div x-show="activeSection === 'publicites'" x-transition>
+                {% include 'admin/publicites.html' %}
+            </div>
+            
+            <!-- Packs Section -->
+            <div x-show="activeSection === 'packs'" x-transition>
+                {% include 'admin/packs.html' %}
             </div>
         </main>
     </div>
