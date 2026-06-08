@@ -225,7 +225,7 @@
         Chargement...
     </div>
     
-    <div x-show="!loading" class="space-y-4">
+    <div x-show="!loading" class="space-y-4 max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-rose scrollbar-track-gray-200">
         <template x-for="ad in getFilteredAds()" :key="ad.id">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex items-start gap-4">

@@ -19,7 +19,7 @@
         age_max: ''
     },
     pagination: {
-        currentPage: 1,
+        currentPage: parseInt(localStorage.getItem('homePage')) || 1,
         totalPages: 1,
         total: 0,
         limit: 9
@@ -84,22 +84,26 @@
                 this.pagination.total = data.total;
                 this.pagination.totalPages = data.total_pages;
                 this.pagination.currentPage = data.page;
+                localStorage.setItem('homePage', data.page);
                 this.loading = false;
             });
     },
     goToPage(page) {
         this.pagination.currentPage = page;
+        localStorage.setItem('homePage', page);
         this.loadProfils();
     },
     nextPage() {
         if (this.pagination.currentPage < this.pagination.totalPages) {
             this.pagination.currentPage++;
+            localStorage.setItem('homePage', this.pagination.currentPage);
             this.loadProfils();
         }
     },
     prevPage() {
         if (this.pagination.currentPage > 1) {
             this.pagination.currentPage--;
+            localStorage.setItem('homePage', this.pagination.currentPage);
             this.loadProfils();
         }
     },
