@@ -211,12 +211,17 @@ sudo systemctl restart nginx
 - **Régions et Communes** : API pour les villes et quartiers du Cameroun
 - **Profils recommandés** : Algorithme basé sur le genre, les visites et la distance
 - **Pagination** : Support de pagination pour les listes de profils
-- **Admin** : 
+- **Admin** :
   - Tableau de bord avec statistiques (utilisateurs totaux, actifs/inactifs)
   - Gestion des utilisateurs (promotion admin, désactivation)
   - Configuration géographique (CRUD régions/quartiers)
   - Gestion des alertes globales (bannière défilante)
   - Gestion des comptes désactivés (réactivation, affichage des raisons)
+  - **Gestion des publicités** : Validation, rejet avec raison, suspension, suppression
+  - **Gestion des packs publicitaires** : CRUD complet pour les packs d'annonces
+  - **Statistiques détaillées** : Appels, visites de profils, clics WhatsApp
+  - **Notifications admin** : Alertes pour nouvelles publicités et paiements
+  - **Persistance de l'état** : Menu admin et pagination sauvegardés après rafraîchissement
 
 ### Frontend
 
@@ -226,9 +231,13 @@ sudo systemctl restart nginx
 - **Filtres asynchrones** : Filtrage des profils sans rechargement
 - **Communes dynamiques** : Mise à jour automatique des communes selon la ville sélectionnée
 - **Pagination** : Navigation par pages sur l'accueil et les profils similaires
+- **Persistance de pagination** : La page courante est sauvegardée après rafraîchissement
 - **Profils cliquables** : Navigation directe en cliquant sur les cartes
 - **Alertes défilantes** : Bannière d'alertes avec animation marquee
 - **Responsive mobile** : Menu hamburger, layout adapté
+- **Section Publicités** : Affichage des publicités avec défilement automatique lent
+- **Détails des publicités** : Page de détail avec boutons d'appel et WhatsApp
+- **Scrollbars optimisés** : Hauteur 70vh sur les pages admin pour afficher plus de contenu
 
 ### Fonctionnalités Utilisateur
 
@@ -238,7 +247,10 @@ sudo systemctl restart nginx
 - Affichage de distance entre utilisateurs
 - Compteur de visites de profil
 - Statut en ligne
-- Recherche par ville, genre, âge
+- Recherche par ville, genre, âge, commune
+- **Création de publicités** : Upload d'image, sélection de pack, validation par admin
+- **Affichage des publicités** : Bandeau défilant avec publicités validées
+- **Contact via publicités** : Boutons d'appel et WhatsApp sur les détails des publicités
 
 ## Compte Admin
 
@@ -260,6 +272,9 @@ sudo systemctl restart nginx
 - **quartier** : Communes/arrondissements
 - **alerte_globale** : Alertes pour la bannière
 - **password_resets** : Codes de réinitialisation de mot de passe
+- **advertisement** : Publicités avec image, statut, pack, historique de validation
+- **ad_pack** : Packs publicitaires (prix, durée, nombre de publicités)
+- **ad_validation_history** : Historique des validations de publicités
 
 ### Colonnes utilisateur
 - Informations de base (nom, email, mot de passe, âge, genre)
