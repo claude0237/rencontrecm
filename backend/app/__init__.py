@@ -154,10 +154,39 @@ def create_app(config_class=Config):
             return redirect('/')
         return render_template('admin/packs.html')
     
+    @app.route('/admin/subscription-packs')
+    def admin_subscription_packs():
+        from flask import render_template, session, redirect
+        if 'user_id' not in session:
+            return redirect('/login')
+        from app.models import Utilisateur
+        user = Utilisateur.query.get(session['user_id'])
+        if not user or not user.est_admin:
+            return redirect('/')
+        return render_template('admin/subscription_packs.html')
+    
+    @app.route('/admin/user-subscriptions')
+    def admin_user_subscriptions():
+        from flask import render_template, session, redirect
+        if 'user_id' not in session:
+            return redirect('/login')
+        from app.models import Utilisateur
+        user = Utilisateur.query.get(session['user_id'])
+        if not user or not user.est_admin:
+            return redirect('/')
+        return render_template('admin/user_subscriptions.html')
+    
     @app.route('/pub/<int:ad_id>')
     def pub_details(ad_id):
         from flask import render_template
         return render_template('main/pub_details.html')
+    
+    @app.route('/abonnements')
+    def abonnements():
+        from flask import render_template, session, redirect
+        if 'user_id' not in session:
+            return redirect('/login')
+        return render_template('members/abonnements.html')
     
     @app.route('/logout')
     def logout():

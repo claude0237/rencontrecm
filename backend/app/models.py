@@ -63,6 +63,24 @@ class Utilisateur(db.Model):
     region = db.relationship('Region', lazy=True)
     quartier = db.relationship('Quartier', backref='utilisateurs', lazy=True)
     
+    def get_active_subscription(self):
+        """Get the user's active subscription if any"""
+        from app.models import UserSubscription
+        subscription = UserSubscription.query.filter_by(
+            user_id=self.id,
+            statut='actif'
+        ).first()
+        if subscription and subscription.is_active():
+            return subscription
+        return None
+    
+    def get_subscription_badge(self):
+        """Get the user's subscription badge"""
+        subscription = self.get_active_subscription()
+        if subscription and subscription.pack:
+            return subscription.pack.badge
+        return None
+    
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
@@ -76,6 +94,8 @@ class Utilisateur(db.Model):
                 photos_list = json.loads(self.photos)
             except:
                 photos_list = []
+        
+        subscription = self.get_active_subscription()
         
         return {
             'id': self.id,
@@ -103,7 +123,9 @@ class Utilisateur(db.Model):
             'latitude': self.latitude,
             'longitude': self.longitude,
             'equipement': self.equipement,
-            'nombre_visites': self.nombre_visites
+            'nombre_visites': self.nombre_visites,
+            'subscription_badge': self.get_subscription_badge(),
+            'subscription_pack': subscription.pack.to_dict() if subscription and subscription.pack else None
         }
 
 class AlerteGlobale(db.Model):
@@ -327,3 +349,127 @@ class AdminNotification(db.Model):
             'lue': self.lue,
             'created_at': self.created_at.isoformat()
         }
+
+class SubscriptionPack(db.Model):
+    __tablename__ = 'subscription_pack'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(50), nullable=False, unique=True)
+    niveau = db.Column(db.Enum('gratuit', 'bronze', 'silver', 'gold', 'vip'), nullable=False)
+    prix = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    duree_jours = db.Column(db.Integer, nullable=False)
+    profils_consultables_par_jour = db.Column(db.Integer, default=5)
+    contacts_whatsapp_par_jour = db.Column(db.Integer, default=0)
+    appels_directs_par_jour = db.Column(db.Integer, default=0)
+    mise_en_avant_pourcentage = db.Column(db.Integer, default=0)
+    badge = db.Column(db.String(20))
+    actif = db.Column(db.Boolean, default=True)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    subscriptions = db.relationship('UserSubscription', backref='pack', lazy=True, cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nom': self.nom,
+            'niveau': self.niveau,
+            'prix': float(self.prix),
+            'duree_jours': self.duree_jours,
+            'profils_consultables_par_jour': self.profils_consultables_par_jour,
+            'contacts_whatsapp_par_jour': self.contacts_whatsapp_par_jour,
+            'appels_directs_par_jour': self.appels_directs_par_jour,
+            'mise_en_avant_pourcentage': self.mise_en_avant_pourcentage,
+            'badge': self.badge,
+            'actif': self.actif,
+            'description': self.description,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }
+
+class UserSubscription(db.Model):
+    __tablename__ = 'user_subscription'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
+    pack_id = db.Column(db.Integer, db.ForeignKey('subscription_pack.id'), nullable=False)
+    date_debut = db.Column(db.DateTime, default=datetime.utcnow)
+    date_fin = db.Column(db.DateTime, nullable=False)
+    statut = db.Column(db.Enum('actif', 'expire', 'annule'), default='actif')
+    profils_consultes_aujourdhui = db.Column(db.Integer, default=0)
+    contacts_whatsapp_aujourdhui = db.Column(db.Integer, default=0)
+    appels_directs_aujourdhui = db.Column(db.Integer, default=0)
+    dernier_reset_quotas = db.Column(db.DateTime, default=datetime.utcnow)
+    methode_paiement = db.Column(db.String(50), default='manuel')
+    reference_paiement = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    utilisateur = db.relationship('Utilisateur', backref='subscriptions', lazy=True)
+    
+    def is_active(self):
+        return self.statut == 'actif' and self.date_fin > datetime.utcnow()
+    
+    def reset_daily_quotas(self):
+        now = datetime.utcnow()
+        if self.dernier_reset_quotas.date() < now.date():
+            self.profils_consultes_aujourdhui = 0
+            self.contacts_whatsapp_aujourdhui = 0
+            self.appels_directs_aujourdhui = 0
+            self.dernier_reset_quotas = now
+            db.session.commit()
+    
+    def can_view_profile(self):
+        self.reset_daily_quotas()
+        if self.pack.profils_consultables_par_jour == -1:  # Illimité
+            return True
+        return self.profils_consultes_aujourdhui < self.pack.profils_consultables_par_jour
+    
+    def can_view_whatsapp(self):
+        self.reset_daily_quotas()
+        if self.pack.contacts_whatsapp_par_jour == -1:  # Illimité
+            return True
+        return self.contacts_whatsapp_aujourdhui < self.pack.contacts_whatsapp_par_jour
+    
+    def can_call_direct(self):
+        self.reset_daily_quotas()
+        if self.pack.appels_directs_par_jour == -1:  # Illimité
+            return True
+        return self.appels_directs_aujourdhui < self.pack.appels_directs_par_jour
+    
+    def increment_profile_view(self):
+        if self.pack.profils_consultables_par_jour != -1:
+            self.profils_consultes_aujourdhui += 1
+            db.session.commit()
+    
+    def increment_whatsapp_view(self):
+        if self.pack.contacts_whatsapp_par_jour != -1:
+            self.contacts_whatsapp_aujourdhui += 1
+            db.session.commit()
+    
+    def increment_direct_call(self):
+        if self.pack.appels_directs_par_jour != -1:
+            self.appels_directs_aujourdhui += 1
+            db.session.commit()
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'pack_id': self.pack_id,
+            'pack': self.pack.to_dict() if self.pack else None,
+            'date_debut': self.date_debut.isoformat(),
+            'date_fin': self.date_fin.isoformat(),
+            'statut': self.statut,
+            'is_active': self.is_active(),
+            'profils_consultes_aujourdhui': self.profils_consultes_aujourdhui,
+            'contacts_whatsapp_aujourdhui': self.contacts_whatsapp_aujourdhui,
+            'appels_directs_aujourdhui': self.appels_directs_aujourdhui,
+            'dernier_reset_quotas': self.dernier_reset_quotas.isoformat(),
+            'methode_paiement': self.methode_paiement,
+            'reference_paiement': self.reference_paiement,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }
+

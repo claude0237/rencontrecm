@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app import db
-from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel, WhatsAppClick, WhatsAppSetting, Advertisement, AdPack, AdValidationHistory, AdminNotification
+from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel, WhatsAppClick, WhatsAppSetting, Advertisement, AdPack, AdValidationHistory, AdminNotification, SubscriptionPack, UserSubscription
 from app.utils import admin_required
 from datetime import datetime, timedelta
 
@@ -711,3 +711,174 @@ def delete_notification(notification_id):
     db.session.commit()
     
     return jsonify({'message': 'Notification supprimée'}), 200
+
+# Subscription Packs Management
+@admin_bp.route('/subscription-packs', methods=['GET'])
+@admin_required
+def get_subscription_packs():
+    """Get all subscription packs"""
+    packs = SubscriptionPack.query.order_by(SubscriptionPack.prix).all()
+    return jsonify({'packs': [pack.to_dict() for pack in packs]}), 200
+
+@admin_bp.route('/subscription-pack', methods=['POST'])
+@admin_required
+def create_subscription_pack():
+    """Create a new subscription pack"""
+    data = request.get_json()
+    
+    if not data or 'nom' not in data or 'niveau' not in data:
+        return jsonify({'error': 'Nom et niveau requis'}), 400
+    
+    pack = SubscriptionPack(
+        nom=data['nom'],
+        niveau=data['niveau'],
+        prix=data.get('prix', 0),
+        duree_jours=data.get('duree_jours', 30),
+        profils_consultables_par_jour=data.get('profils_consultables_par_jour', 5),
+        contacts_whatsapp_par_jour=data.get('contacts_whatsapp_par_jour', 0),
+        appels_directs_par_jour=data.get('appels_directs_par_jour', 0),
+        mise_en_avant_pourcentage=data.get('mise_en_avant_pourcentage', 0),
+        badge=data.get('badge'),
+        actif=data.get('actif', True),
+        description=data.get('description')
+    )
+    
+    db.session.add(pack)
+    db.session.commit()
+    
+    return jsonify({'message': 'Pack créé', 'pack': pack.to_dict()}), 201
+
+@admin_bp.route('/subscription-pack/<int:pack_id>', methods=['PUT'])
+@admin_required
+def update_subscription_pack(pack_id):
+    """Update a subscription pack"""
+    pack = SubscriptionPack.query.get_or_404(pack_id)
+    data = request.get_json()
+    
+    if 'nom' in data:
+        pack.nom = data['nom']
+    if 'niveau' in data:
+        pack.niveau = data['niveau']
+    if 'prix' in data:
+        pack.prix = data['prix']
+    if 'duree_jours' in data:
+        pack.duree_jours = data['duree_jours']
+    if 'profils_consultables_par_jour' in data:
+        pack.profils_consultables_par_jour = data['profils_consultables_par_jour']
+    if 'contacts_whatsapp_par_jour' in data:
+        pack.contacts_whatsapp_par_jour = data['contacts_whatsapp_par_jour']
+    if 'appels_directs_par_jour' in data:
+        pack.appels_directs_par_jour = data['appels_directs_par_jour']
+    if 'mise_en_avant_pourcentage' in data:
+        pack.mise_en_avant_pourcentage = data['mise_en_avant_pourcentage']
+    if 'badge' in data:
+        pack.badge = data['badge']
+    if 'actif' in data:
+        pack.actif = data['actif']
+    if 'description' in data:
+        pack.description = data['description']
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Pack mis à jour', 'pack': pack.to_dict()}), 200
+
+@admin_bp.route('/subscription-pack/<int:pack_id>', methods=['DELETE'])
+@admin_required
+def delete_subscription_pack(pack_id):
+    """Delete a subscription pack"""
+    pack = SubscriptionPack.query.get_or_404(pack_id)
+    db.session.delete(pack)
+    db.session.commit()
+    
+    return jsonify({'message': 'Pack supprimé'}), 200
+
+# User Subscription Management
+@admin_bp.route('/user-subscriptions', methods=['GET'])
+@admin_required
+def get_user_subscriptions():
+    """Get all user subscriptions"""
+    subscriptions = UserSubscription.query.order_by(UserSubscription.created_at.desc()).all()
+    return jsonify({'subscriptions': [sub.to_dict() for sub in subscriptions]}), 200
+
+@admin_bp.route('/user-subscription', methods=['POST'])
+@admin_required
+def create_user_subscription():
+    """Create a user subscription (manual assignment by admin)"""
+    data = request.get_json()
+    
+    if not data or 'user_id' not in data or 'pack_id' not in data:
+        return jsonify({'error': 'user_id et pack_id requis'}), 400
+    
+    user = Utilisateur.query.get_or_404(data['user_id'])
+    pack = SubscriptionPack.query.get_or_404(data['pack_id'])
+    
+    # Check if user already has an active subscription
+    existing = UserSubscription.query.filter_by(
+        user_id=data['user_id'],
+        statut='actif'
+    ).first()
+    
+    if existing:
+        return jsonify({'error': 'Cet utilisateur a déjà un abonnement actif'}), 400
+    
+    date_fin = datetime.utcnow() + timedelta(days=pack.duree_jours)
+    
+    subscription = UserSubscription(
+        user_id=data['user_id'],
+        pack_id=data['pack_id'],
+        date_debut=datetime.utcnow(),
+        date_fin=date_fin,
+        methode_paiement=data.get('methode_paiement', 'manuel'),
+        reference_paiement=data.get('reference_paiement')
+    )
+    
+    db.session.add(subscription)
+    db.session.commit()
+    
+    return jsonify({'message': 'Abonnement créé', 'subscription': subscription.to_dict()}), 201
+
+@admin_bp.route('/user-subscription/<int:subscription_id>', methods=['PUT'])
+@admin_required
+def update_user_subscription(subscription_id):
+    """Update a user subscription"""
+    subscription = UserSubscription.query.get_or_404(subscription_id)
+    data = request.get_json()
+    
+    if 'statut' in data:
+        subscription.statut = data['statut']
+    if 'pack_id' in data:
+        pack = SubscriptionPack.query.get_or_404(data['pack_id'])
+        subscription.pack_id = data['pack_id']
+        # Recalculate end date based on new pack duration
+        if subscription.statut == 'actif':
+            subscription.date_fin = subscription.date_debut + timedelta(days=pack.duree_jours)
+    if 'date_fin' in data:
+        subscription.date_fin = datetime.fromisoformat(data['date_fin'])
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Abonnement mis à jour', 'subscription': subscription.to_dict()}), 200
+
+@admin_bp.route('/user-subscription/<int:subscription_id>', methods=['DELETE'])
+@admin_required
+def delete_user_subscription(subscription_id):
+    """Delete a user subscription"""
+    subscription = UserSubscription.query.get_or_404(subscription_id)
+    db.session.delete(subscription)
+    db.session.commit()
+    
+    return jsonify({'message': 'Abonnement supprimé'}), 200
+
+@admin_bp.route('/user/<int:user_id>/subscription', methods=['GET'])
+@admin_required
+def get_user_subscription(user_id):
+    """Get current subscription for a specific user"""
+    subscription = UserSubscription.query.filter_by(
+        user_id=user_id,
+        statut='actif'
+    ).first()
+    
+    if subscription:
+        return jsonify({'subscription': subscription.to_dict()}), 200
+    return jsonify({'subscription': None}), 200
+

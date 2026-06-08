@@ -1,10 +1,11 @@
 from flask import Blueprint, request, jsonify, current_app, session
 from app import db
-from app.models import Region, Quartier, Utilisateur, Appel, WhatsAppClick, WhatsAppSetting
+from app.models import Region, Quartier, Utilisateur, Appel, WhatsAppClick, WhatsAppSetting, SubscriptionPack, UserSubscription
 import json
 import os
 import math
 from werkzeug.utils import secure_filename
+from datetime import datetime, timedelta
 
 members_bp = Blueprint('members', __name__)
 
@@ -297,6 +298,23 @@ def track_appel(appele_id):
     if not appele.actif:
         return jsonify({'error': 'Ce compte est désactivé'}), 403
     
+    # Check subscription restrictions for authenticated users
+    if appelant_id:
+        subscription = UserSubscription.query.filter_by(
+            user_id=appelant_id,
+            statut='actif'
+        ).first()
+        
+        if subscription:
+            subscription.reset_daily_quotas()
+            if not subscription.can_call_direct():
+                return jsonify({
+                    'error': 'Quota d\'appels directs atteint pour aujourd\'hui',
+                    'quota_used': subscription.appels_directs_aujourdhui,
+                    'quota_limit': subscription.pack.appels_directs_par_jour
+                }), 403
+            subscription.increment_direct_call()
+    
     # Create call record (appelant_id can be NULL for anonymous visitors)
     appel = Appel(
         appelant_id=appelant_id,
@@ -333,6 +351,23 @@ def track_whatsapp_click(cible_id):
     if not cible.whatsapp_enabled:
         return jsonify({'error': 'Le contact WhatsApp est désactivé pour cet utilisateur'}), 403
     
+    # Check subscription restrictions for authenticated users
+    if cliquant_id:
+        subscription = UserSubscription.query.filter_by(
+            user_id=cliquant_id,
+            statut='actif'
+        ).first()
+        
+        if subscription:
+            subscription.reset_daily_quotas()
+            if not subscription.can_view_whatsapp():
+                return jsonify({
+                    'error': 'Quota de contacts WhatsApp atteint pour aujourd\'hui',
+                    'quota_used': subscription.contacts_whatsapp_aujourdhui,
+                    'quota_limit': subscription.pack.contacts_whatsapp_par_jour
+                }), 403
+            subscription.increment_whatsapp_view()
+    
     # Get default WhatsApp message
     setting = WhatsAppSetting.query.first()
     default_message = setting.default_message if setting else 'Bonjour {nom}, je vous contacte depuis RencontreCm.'
@@ -357,3 +392,71 @@ def track_whatsapp_click(cible_id):
         'whatsapp_click': whatsapp_click.to_dict(),
         'whatsapp_url': whatsapp_url
     }), 200
+
+# Subscription Management for Users
+@members_bp.route('/subscription-packs', methods=['GET'])
+def get_available_subscription_packs():
+    """Get all available subscription packs for users"""
+    packs = SubscriptionPack.query.filter_by(actif=True).order_by(SubscriptionPack.prix).all()
+    return jsonify({'packs': [pack.to_dict() for pack in packs]}), 200
+
+@members_bp.route('/my-subscription', methods=['GET'])
+def get_my_subscription():
+    """Get current user's subscription"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    subscription = UserSubscription.query.filter_by(
+        user_id=session['user_id'],
+        statut='actif'
+    ).first()
+    
+    if subscription:
+        # Reset daily quotas if needed
+        subscription.reset_daily_quotas()
+        return jsonify({'subscription': subscription.to_dict()}), 200
+    return jsonify({'subscription': None}), 200
+
+@members_bp.route('/subscription/purchase', methods=['POST'])
+def purchase_subscription():
+    """Purchase or upgrade a subscription"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    data = request.get_json()
+    
+    if not data or 'pack_id' not in data:
+        return jsonify({'error': 'pack_id requis'}), 400
+    
+    pack = SubscriptionPack.query.get_or_404(data['pack_id'])
+    
+    if not pack.actif:
+        return jsonify({'error': 'Ce pack n\'est pas disponible'}), 400
+    
+    # Check if user already has an active subscription
+    existing = UserSubscription.query.filter_by(
+        user_id=session['user_id'],
+        statut='actif'
+    ).first()
+    
+    if existing:
+        # Upgrade: cancel existing and create new
+        existing.statut = 'annule'
+        db.session.commit()
+    
+    date_fin = datetime.utcnow() + timedelta(days=pack.duree_jours)
+    
+    subscription = UserSubscription(
+        user_id=session['user_id'],
+        pack_id=data['pack_id'],
+        date_debut=datetime.utcnow(),
+        date_fin=date_fin,
+        methode_paiement=data.get('methode_paiement', 'pending'),
+        reference_paiement=data.get('reference_paiement')
+    )
+    
+    db.session.add(subscription)
+    db.session.commit()
+    
+    return jsonify({'message': 'Abonnement créé avec succès', 'subscription': subscription.to_dict()}), 201
+

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, session, jsonify
 from datetime import datetime, timedelta
 from app import db
-from app.models import Utilisateur, PasswordReset
+from app.models import Utilisateur, PasswordReset, SubscriptionPack, UserSubscription
 from app.services.notification_service import NotificationService
 import json
 import random
@@ -62,6 +62,21 @@ def register():
     
     db.session.add(user)
     db.session.commit()
+    
+    # Assign free trial pack to new user
+    free_pack = SubscriptionPack.query.filter_by(niveau='gratuit', actif=True).first()
+    if free_pack:
+        date_fin = datetime.utcnow() + timedelta(days=free_pack.duree_jours)
+        subscription = UserSubscription(
+            user_id=user.id,
+            pack_id=free_pack.id,
+            date_debut=datetime.utcnow(),
+            date_fin=date_fin,
+            methode_paiement='gratuit',
+            reference_paiement='trial'
+        )
+        db.session.add(subscription)
+        db.session.commit()
     
     session['user_id'] = user.id
     session['is_admin'] = user.est_admin

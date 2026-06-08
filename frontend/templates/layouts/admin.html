@@ -33,6 +33,7 @@
     sidebarOpen: false,
     statistiquesOpen: localStorage.getItem('adminStatistiquesOpen') === 'true',
     gestionPubOpen: localStorage.getItem('adminGestionPubOpen') === 'true',
+    gestionAbonnementOpen: localStorage.getItem('adminGestionAbonnementOpen') === 'true',
     setActiveSection(section) {
         this.activeSection = section;
         localStorage.setItem('adminActiveSection', section);
@@ -45,6 +46,10 @@
             this.gestionPubOpen = true;
             localStorage.setItem('adminGestionPubOpen', 'true');
         }
+        if (['subscription-packs', 'user-subscriptions'].includes(section)) {
+            this.gestionAbonnementOpen = true;
+            localStorage.setItem('adminGestionAbonnementOpen', 'true');
+        }
     },
     toggleStatistiques() {
         this.statistiquesOpen = !this.statistiquesOpen;
@@ -53,6 +58,10 @@
     toggleGestionPub() {
         this.gestionPubOpen = !this.gestionPubOpen;
         localStorage.setItem('adminGestionPubOpen', this.gestionPubOpen);
+    },
+    toggleGestionAbonnement() {
+        this.gestionAbonnementOpen = !this.gestionAbonnementOpen;
+        localStorage.setItem('adminGestionAbonnementOpen', this.gestionAbonnementOpen);
     }
 }" x-cloak>
     <!-- Admin Navigation -->
@@ -178,6 +187,28 @@
                             </button>
                         </div>
                     </div>
+                    
+                    <!-- Gestion des Abonnements Submenu -->
+                    <div>
+                        <button @click="toggleGestionAbonnement()" 
+                            :class="gestionAbonnementOpen ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                            class="w-full text-left px-4 py-3 rounded-lg transition flex items-center justify-between">
+                            <span>💎 Gestion des Abonnements</span>
+                            <span x-text="gestionAbonnementOpen ? '▼' : '▶'"></span>
+                        </button>
+                        <div x-show="gestionAbonnementOpen" x-transition class="pl-4 mt-2 space-y-2">
+                            <button @click="setActiveSection('subscription-packs')" 
+                                :class="activeSection === 'subscription-packs' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                📦 Packs d'Abonnement
+                            </button>
+                            <button @click="setActiveSection('user-subscriptions')" 
+                                :class="activeSection === 'user-subscriptions' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                👥 Abonnements Utilisateurs
+                            </button>
+                        </div>
+                    </div>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -280,6 +311,28 @@
                             </button>
                         </div>
                     </div>
+                    
+                    <!-- Gestion des Abonnements Submenu -->
+                    <div>
+                        <button @click="toggleGestionAbonnement()" 
+                            :class="gestionAbonnementOpen ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                            class="w-full text-left px-4 py-3 rounded-lg transition flex items-center justify-between">
+                            <span>💎 Gestion des Abonnements</span>
+                            <span x-text="gestionAbonnementOpen ? '▼' : '▶'"></span>
+                        </button>
+                        <div x-show="gestionAbonnementOpen" x-transition class="pl-4 mt-2 space-y-2">
+                            <button @click="setActiveSection('subscription-packs'); sidebarOpen = false" 
+                                :class="activeSection === 'subscription-packs' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                📦 Packs d'Abonnement
+                            </button>
+                            <button @click="setActiveSection('user-subscriptions'); sidebarOpen = false" 
+                                :class="activeSection === 'user-subscriptions' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                👥 Abonnements Utilisateurs
+                            </button>
+                        </div>
+                    </div>
                 </nav>
             </div>
             <div class="p-6 border-t border-gray-700">
@@ -337,6 +390,16 @@
             <!-- Packs Section -->
             <div x-show="activeSection === 'packs'" x-transition>
                 {% include 'admin/packs.html' %}
+            </div>
+            
+            <!-- Subscription Packs Section -->
+            <div x-show="activeSection === 'subscription-packs'" x-transition>
+                {% include 'admin/subscription_packs.html' %}
+            </div>
+            
+            <!-- User Subscriptions Section -->
+            <div x-show="activeSection === 'user-subscriptions'" x-transition>
+                {% include 'admin/user_subscriptions.html' %}
             </div>
         </main>
     </div>

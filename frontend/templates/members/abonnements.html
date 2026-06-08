@@ -1,0 +1,242 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Mes Abonnements - RencontresCM{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-4xl font-bold text-rose mb-8">Mes Abonnements</h1>
+
+    <!-- Current Subscription -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+        <h2 class="text-2xl font-bold text-charcoal mb-4">Mon Abonnement Actuel</h2>
+        
+        <div x-show="loadingSubscription" class="text-center py-8">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-rose"></div>
+            <p class="mt-2 text-gray-600">Chargement...</p>
+        </div>
+
+        <div x-show="!loadingSubscription">
+            <div x-show="subscription" class="bg-cream rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-2xl font-bold text-charcoal" x-text="subscription.pack?.nom"></h3>
+                        <span x-show="subscription.pack?.badge" 
+                            :class="{
+                                'bg-yellow-500': subscription.pack?.niveau === 'gold',
+                                'bg-gray-400': subscription.pack?.niveau === 'silver',
+                                'bg-orange-600': subscription.pack?.niveau === 'bronze',
+                                'bg-purple-600': subscription.pack?.niveau === 'vip',
+                                'bg-green-500': subscription.pack?.niveau === 'gratuit'
+                            }"
+                            class="text-white px-3 py-1 rounded-full text-sm font-semibold inline-block mt-2"
+                            x-text="subscription.pack?.badge">
+                        </span>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-600">Statut</p>
+                        <span :class="{
+                            'bg-green-100 text-green-800': subscription.statut === 'actif',
+                            'bg-red-100 text-red-800': subscription.statut === 'expire',
+                            'bg-gray-100 text-gray-800': subscription.statut === 'annule'
+                        }"
+                        class="px-2 py-1 rounded-full text-xs font-semibold"
+                        x-text="subscription.statut">
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <p class="text-sm text-gray-600">Date de début</p>
+                        <p class="font-semibold text-charcoal" x-text="formatDate(subscription.date_debut)"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Date de fin</p>
+                        <p class="font-semibold text-charcoal" x-text="formatDate(subscription.date_fin)"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Jours restants</p>
+                        <p class="font-semibold text-charcoal" x-text="daysRemaining(subscription.date_fin)"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Prix payé</p>
+                        <p class="font-semibold text-charcoal" x-text="subscription.pack?.prix + ' FCFA'"></p>
+                    </div>
+                </div>
+                
+                <div class="border-t border-gray-200 pt-4">
+                    <h4 class="font-semibold text-charcoal mb-2">Quotas du jour</h4>
+                    <div class="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-600">Profils consultés:</span>
+                            <span class="font-semibold" x-text="subscription.pack?.profils_consultables_par_jour === -1 ? '∞' : subscription.profils_consultes_aujourdhui + '/' + subscription.pack?.profils_consultables_par_jour"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">WhatsApp:</span>
+                            <span class="font-semibold" x-text="subscription.pack?.contacts_whatsapp_par_jour === -1 ? '∞' : subscription.contacts_whatsapp_aujourdhui + '/' + subscription.pack?.contacts_whatsapp_par_jour"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-600">Appels directs:</span>
+                            <span class="font-semibold" x-text="subscription.pack?.appels_directs_par_jour === -1 ? '∞' : subscription.appels_directs_aujourdhui + '/' + subscription.pack?.appels_directs_par_jour"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div x-show="!subscription" class="bg-gray-100 rounded-lg p-6 text-center">
+                <p class="text-gray-600 mb-4">Vous n'avez pas d'abonnement actif</p>
+                <p class="text-sm text-gray-500">Choisissez un pack ci-dessous pour commencer</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available Packs -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-charcoal mb-6">Packs Disponibles</h2>
+        
+        <div x-show="loadingPacks" class="text-center py-8">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-rose"></div>
+            <p class="mt-2 text-gray-600">Chargement...</p>
+        </div>
+
+        <div x-show="!loadingPacks" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <template x-for="pack in packs" :key="pack.id">
+                <div class="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition relative">
+                    <div x-show="pack.niveau === 'vip'" class="absolute top-0 right-0 bg-purple-600 text-white px-3 py-1 rounded-bl-lg rounded-tr-lg text-xs font-semibold">
+                        POPULAIRE
+                    </div>
+                    
+                    <div class="flex items-center gap-3 mb-4">
+                        <h3 class="text-xl font-bold text-charcoal" x-text="pack.nom"></h3>
+                        <span x-show="pack.badge" 
+                            :class="{
+                                'bg-yellow-500': pack.niveau === 'gold',
+                                'bg-gray-400': pack.niveau === 'silver',
+                                'bg-orange-600': pack.niveau === 'bronze',
+                                'bg-purple-600': pack.niveau === 'vip',
+                                'bg-green-500': pack.niveau === 'gratuit'
+                            }"
+                            class="text-white px-2 py-1 rounded-full text-xs font-semibold"
+                            x-text="pack.badge">
+                        </span>
+                    </div>
+                    
+                    <p class="text-3xl font-bold text-rose mb-4" x-text="pack.prix + ' FCFA'"></p>
+                    <p class="text-sm text-gray-600 mb-4" x-text="pack.duree_jours + ' jours'"></p>
+                    
+                    <ul class="text-sm space-y-2 mb-6">
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span x-text="pack.profils_consultables_par_jour === -1 ? 'Profils illimités' : pack.profils_consultables_par_jour + ' profils/jour'"></span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span x-text="pack.contacts_whatsapp_par_jour === -1 ? 'WhatsApp illimité' : pack.contacts_whatsapp_par_jour + ' WhatsApp/jour'"></span>
+                        </li>
+                        <li class="flex items-center">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span x-text="pack.appels_directs_par_jour === -1 ? 'Appels illimités' : pack.appels_directs_par_jour + ' appels/jour'"></span>
+                        </li>
+                        <li class="flex items-center" x-show="pack.mise_en_avant_pourcentage > 0">
+                            <span class="text-green-500 mr-2">✓</span>
+                            <span x-text="'Mise en avant +' + pack.mise_en_avant_pourcentage + '%'"></span>
+                        </li>
+                    </ul>
+                    
+                    <button @click="purchasePack(pack)" 
+                        :disabled="purchasing"
+                        :class="subscription?.pack_id === pack.id ? 'bg-gray-400 cursor-not-allowed' : 'bg-rose hover:bg-rose-dark'"
+                        class="w-full text-white py-3 rounded-lg font-semibold transition disabled:opacity-50">
+                        <span x-show="subscription?.pack_id === pack.id">Pack actuel</span>
+                        <span x-show="subscription?.pack_id !== pack.id && !purchasing">Choisir ce pack</span>
+                        <span x-show="purchasing">Traitement...</span>
+                    </button>
+                </div>
+            </template>
+        </div>
+    </div>
+</div>
+
+<script>
+function abonnements() {
+    return {
+        subscription: null,
+        packs: [],
+        loadingSubscription: false,
+        loadingPacks: false,
+        purchasing: false,
+        init() {
+            this.loadMySubscription();
+            this.loadPacks();
+        },
+        loadMySubscription() {
+            this.loadingSubscription = true;
+            fetch('/api/v1/members/my-subscription')
+                .then(r => r.json())
+                .then(data => {
+                    this.subscription = data.subscription;
+                    this.loadingSubscription = false;
+                })
+                .catch(err => {
+                    console.error('Error loading subscription:', err);
+                    this.loadingSubscription = false;
+                });
+        },
+        loadPacks() {
+            this.loadingPacks = true;
+            fetch('/api/v1/members/subscription-packs')
+                .then(r => r.json())
+                .then(data => {
+                    this.packs = data.packs;
+                    this.loadingPacks = false;
+                })
+                .catch(err => {
+                    console.error('Error loading packs:', err);
+                    this.loadingPacks = false;
+                });
+        },
+        purchasePack(pack) {
+            if (this.subscription?.pack_id === pack.id) return;
+            
+            if (!confirm(`Voulez-vous vraiment souscrire au pack ${pack.nom} pour ${pack.prix} FCFA?`)) return;
+            
+            this.purchasing = true;
+            fetch('/api/v1/members/subscription/purchase', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pack_id: pack.id })
+            })
+            .then(r => r.json())
+            .then(data => {
+                this.purchasing = false;
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    alert('Abonnement créé avec succès!');
+                    this.loadMySubscription();
+                }
+            })
+            .catch(err => {
+                console.error('Error purchasing subscription:', err);
+                this.purchasing = false;
+                alert('Erreur lors de l\'achat de l\'abonnement');
+            });
+        },
+        formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        },
+        daysRemaining(dateStr) {
+            const now = new Date();
+            const endDate = new Date(dateStr);
+            const diffTime = endDate - now;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays > 0 ? diffDays : 0;
+        }
+    };
+}
+</script>
