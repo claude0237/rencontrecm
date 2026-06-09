@@ -35,8 +35,10 @@
     gestionPubOpen: localStorage.getItem('adminGestionPubOpen') === 'true',
     gestionAbonnementOpen: localStorage.getItem('adminGestionAbonnementOpen') === 'true',
     setActiveSection(section) {
+        console.log('setActiveSection called with:', section);
         this.activeSection = section;
         localStorage.setItem('adminActiveSection', section);
+        console.log('activeSection set to:', this.activeSection);
         // Keep parent submenu open based on section
         if (['comptes-desactives', 'statistiques-appels', 'statistiques-visites', 'statistiques-whatsapp'].includes(section)) {
             this.statistiquesOpen = true;
@@ -207,7 +209,7 @@
                                 class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
                                 👥 Abonnements Utilisateurs
                             </button>
-                            <button @click="setActiveSection('upgrade-requests')" 
+                            <button @click="console.log('Upgrade requests button clicked'); setActiveSection('upgrade-requests')" 
                                 :class="activeSection === 'upgrade-requests' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
                                 class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
                                 📨 Demandes d'Upgrade
@@ -405,6 +407,11 @@
             <!-- User Subscriptions Section -->
             <div x-show="activeSection === 'user-subscriptions'" x-transition>
                 {% include 'admin/user_subscriptions.html' %}
+            </div>
+            
+            <!-- Upgrade Requests Section -->
+            <div x-show="activeSection === 'upgrade-requests'" x-transition>
+                {% include 'admin/upgrade_requests.html' %}
             </div>
         </main>
     </div>

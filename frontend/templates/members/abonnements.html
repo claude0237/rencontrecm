@@ -3,7 +3,7 @@
 {% block title %}Mes Abonnements - RencontresCM{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div x-data="abonnements()" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <h1 class="text-4xl font-bold text-rose mb-8">Mes Abonnements</h1>
 
     <!-- Current Subscription -->
@@ -155,34 +155,34 @@
             </template>
         </div>
     </div>
-</div>
 
-<!-- Payment Method Modal -->
-<div x-show="showPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 class="text-xl font-bold text-charcoal mb-4">Choisir le mode de paiement</h3>
-        <p class="text-gray-600 mb-4" x-text="'Pack: ' + selectedPack?.nom + ' - ' + selectedPack?.prix + ' FCFA'"></p>
-        
-        <div class="space-y-3">
-            <button @click="payWithMobileMoney('Orange Money')" 
-                class="w-full bg-orange-500 text-white px-4 py-3 rounded-lg hover:bg-orange-600 transition flex items-center justify-center">
-                📱 Orange Money
-            </button>
-            <button @click="payWithMobileMoney('MTN Mobile Money')" 
-                class="w-full bg-yellow-500 text-white px-4 py-3 rounded-lg hover:bg-yellow-600 transition flex items-center justify-center">
-                📱 MTN Mobile Money
-            </button>
-            <button @click="payManually()" 
-                class="w-full bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600 transition flex items-center justify-center">
-                📝 Demande manuelle
-            </button>
-        </div>
-        
-        <div class="mt-4">
-            <button @click="showPaymentModal = false" 
-                class="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
-                Annuler
-            </button>
+    <!-- Payment Method Modal -->
+    <div x-show="showPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-charcoal mb-4">Choisir le mode de paiement</h3>
+            <p class="text-gray-600 mb-4" x-text="'Pack: ' + selectedPack?.nom + ' - ' + selectedPack?.prix + ' FCFA'"></p>
+            
+            <div class="space-y-3">
+                <button @click="payWithMobileMoney('Orange Money')" 
+                    class="w-full bg-orange-500 text-white px-4 py-3 rounded-lg hover:bg-orange-600 transition flex items-center justify-center">
+                    📱 Orange Money
+                </button>
+                <button @click="payWithMobileMoney('MTN Mobile Money')" 
+                    class="w-full bg-yellow-500 text-white px-4 py-3 rounded-lg hover:bg-yellow-600 transition flex items-center justify-center">
+                    📱 MTN Mobile Money
+                </button>
+                <button @click="payManually()" 
+                    class="w-full bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600 transition flex items-center justify-center">
+                    📝 Demande manuelle
+                </button>
+            </div>
+            
+            <div class="mt-4">
+                <button @click="showPaymentModal = false" 
+                    class="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
+                    Annuler
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -203,7 +203,7 @@ function abonnements() {
         },
         loadMySubscription() {
             this.loadingSubscription = true;
-            fetch('/api/v1/members/my-subscription')
+            fetch('/api/v1/my-subscription')
                 .then(r => r.json())
                 .then(data => {
                     this.subscription = data.subscription;
@@ -216,11 +216,13 @@ function abonnements() {
         },
         loadPacks() {
             this.loadingPacks = true;
-            fetch('/api/v1/members/subscription-packs')
+            fetch('/api/v1/subscription-packs')
                 .then(r => r.json())
                 .then(data => {
-                    this.packs = data.packs;
+                    console.log('Packs loaded:', data);
+                    this.packs = data.packs || [];
                     this.loadingPacks = false;
+                    console.log('LoadingPacks set to false, packs:', this.packs);
                 })
                 .catch(err => {
                     console.error('Error loading packs:', err);
@@ -240,7 +242,7 @@ function abonnements() {
             if (!confirm(`Voulez-vous envoyer une demande d'upgrade pour le pack ${pack.nom}? L'admin traitera votre demande manuellement.`)) return;
             
             this.purchasing = true;
-            fetch('/api/v1/members/subscription/upgrade-request', {
+            fetch('/api/v1/subscription/upgrade-request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -296,3 +298,4 @@ function abonnements() {
     };
 }
 </script>
+{% endblock %}

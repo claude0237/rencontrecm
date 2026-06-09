@@ -63,7 +63,7 @@ def register():
     db.session.add(user)
     db.session.commit()
     
-    # Assign free trial pack to new user
+    # Assign free trial pack to new user with first discovery period benefits
     free_pack = SubscriptionPack.query.filter_by(niveau='gratuit', actif=True).first()
     if free_pack:
         date_fin = datetime.utcnow() + timedelta(days=free_pack.duree_jours)
@@ -73,7 +73,8 @@ def register():
             date_debut=datetime.utcnow(),
             date_fin=date_fin,
             methode_paiement='gratuit',
-            reference_paiement='trial'
+            reference_paiement='trial',
+            premiere_periode_decouverte=True  # First discovery period with full benefits
         )
         db.session.add(subscription)
         db.session.commit()

@@ -25,6 +25,12 @@ def create_app(config_class=Config):
     app.register_blueprint(admin_bp, url_prefix='/api/v1/admin')
     app.register_blueprint(ads_bp, url_prefix='/api/v1/ads')
     
+    print("Blueprints registered:")
+    print("- auth_bp: /api/v1/auth")
+    print("- members_bp: /api/v1")
+    print("- admin_bp: /api/v1/admin")
+    print("- ads_bp: /api/v1/ads")
+    
     @app.route('/')
     def index():
         from flask import render_template

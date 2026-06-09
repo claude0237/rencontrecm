@@ -268,7 +268,7 @@ class Advertisement(db.Model):
     numero_contact = db.Column(db.String(50))
     whatsapp = db.Column(db.String(50))
     duree_jours = db.Column(db.Integer, nullable=False)
-    statut = db.Column(db.String(20), default='brouillon')  # brouillon, en_attente, validee, rejetee, suspendue, expiree
+    statut = db.Column(db.String(30), default='brouillon')  # brouillon, en_attente, validee_en_attente_paiement, validee, rejetee, suspendue, expiree
     pack_id = db.Column(db.Integer, db.ForeignKey('ad_packs.id'))
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
     date_debut_validite = db.Column(db.DateTime)
@@ -403,6 +403,7 @@ class UserSubscription(db.Model):
     dernier_reset_quotas = db.Column(db.DateTime, default=datetime.utcnow)
     methode_paiement = db.Column(db.String(50), default='manuel')
     reference_paiement = db.Column(db.String(100))
+    premiere_periode_decouverte = db.Column(db.Boolean, default=False)  # Track if this is first discovery period with full benefits
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -416,6 +417,13 @@ class UserSubscription(db.Model):
         if self.statut == 'actif' and self.date_fin <= datetime.utcnow():
             self.statut = 'expire'
             db.session.commit()
+            
+            # Check if user has already used their first discovery period
+            has_used_first_discovery = UserSubscription.query.filter_by(
+                user_id=self.user_id,
+                premiere_periode_decouverte=True
+            ).first()
+            
             # Assign free pack automatically
             free_pack = SubscriptionPack.query.filter_by(niveau='gratuit').first()
             if free_pack:
@@ -423,7 +431,8 @@ class UserSubscription(db.Model):
                     user_id=self.user_id,
                     pack_id=free_pack.id,
                     date_fin=datetime.utcnow() + timedelta(days=free_pack.duree_jours),
-                    statut='actif'
+                    statut='actif',
+                    premiere_periode_decouverte=not has_used_first_discovery  # Only true if never used before
                 )
                 db.session.add(new_subscription)
                 db.session.commit()
@@ -441,33 +450,51 @@ class UserSubscription(db.Model):
     
     def can_view_profile(self):
         self.reset_daily_quotas()
+        # If first discovery period, give unlimited access
+        if self.premiere_periode_decouverte and self.pack.niveau == 'gratuit':
+            return True
         if self.pack.profils_consultables_par_jour == -1:  # Illimité
             return True
         return self.profils_consultes_aujourdhui < self.pack.profils_consultables_par_jour
     
     def can_view_whatsapp(self):
         self.reset_daily_quotas()
+        # If first discovery period, give unlimited access
+        if self.premiere_periode_decouverte and self.pack.niveau == 'gratuit':
+            return True
         if self.pack.contacts_whatsapp_par_jour == -1:  # Illimité
             return True
         return self.contacts_whatsapp_aujourdhui < self.pack.contacts_whatsapp_par_jour
     
     def can_call_direct(self):
         self.reset_daily_quotas()
+        # If first discovery period, give unlimited access
+        if self.premiere_periode_decouverte and self.pack.niveau == 'gratuit':
+            return True
         if self.pack.appels_directs_par_jour == -1:  # Illimité
             return True
         return self.appels_directs_aujourdhui < self.pack.appels_directs_par_jour
     
     def increment_profile_view(self):
+        # Don't increment quotas during first discovery period
+        if self.premiere_periode_decouverte and self.pack.niveau == 'gratuit':
+            return
         if self.pack.profils_consultables_par_jour != -1:
             self.profils_consultes_aujourdhui += 1
             db.session.commit()
     
     def increment_whatsapp_view(self):
+        # Don't increment quotas during first discovery period
+        if self.premiere_periode_decouverte and self.pack.niveau == 'gratuit':
+            return
         if self.pack.contacts_whatsapp_par_jour != -1:
             self.contacts_whatsapp_aujourdhui += 1
             db.session.commit()
     
     def increment_direct_call(self):
+        # Don't increment quotas during first discovery period
+        if self.premiere_periode_decouverte and self.pack.niveau == 'gratuit':
+            return
         if self.pack.appels_directs_par_jour != -1:
             self.appels_directs_aujourdhui += 1
             db.session.commit()
@@ -488,6 +515,7 @@ class UserSubscription(db.Model):
             'dernier_reset_quotas': self.dernier_reset_quotas.isoformat(),
             'methode_paiement': self.methode_paiement,
             'reference_paiement': self.reference_paiement,
+            'premiere_periode_decouverte': self.premiere_periode_decouverte,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

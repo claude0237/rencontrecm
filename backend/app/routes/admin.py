@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from app import db
 from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel, WhatsAppClick, WhatsAppSetting, Advertisement, AdPack, AdValidationHistory, AdminNotification, SubscriptionPack, UserSubscription, SubscriptionUpgradeRequest
 from app.utils import admin_required
@@ -797,8 +797,19 @@ def delete_subscription_pack(pack_id):
 @admin_required
 def get_user_subscriptions():
     """Get all user subscriptions"""
-    subscriptions = UserSubscription.query.order_by(UserSubscription.created_at.desc()).all()
-    return jsonify({'subscriptions': [sub.to_dict() for sub in subscriptions]}), 200
+    from sqlalchemy.orm import joinedload
+    subscriptions = UserSubscription.query.options(
+        joinedload(UserSubscription.utilisateur),
+        joinedload(UserSubscription.pack)
+    ).order_by(UserSubscription.created_at.desc()).all()
+    
+    subscriptions_data = []
+    for sub in subscriptions:
+        sub_dict = sub.to_dict()
+        sub_dict['utilisateur'] = sub.utilisateur.to_dict() if sub.utilisateur else None
+        subscriptions_data.append(sub_dict)
+    
+    return jsonify({'subscriptions': subscriptions_data}), 200
 
 @admin_bp.route('/user-subscription', methods=['POST'])
 @admin_required
@@ -887,22 +898,32 @@ def get_user_subscription(user_id):
 @admin_required
 def get_upgrade_requests():
     """Get all upgrade requests"""
+    from sqlalchemy.orm import joinedload
     statut = request.args.get('statut')
-    query = SubscriptionUpgradeRequest.query
+    query = SubscriptionUpgradeRequest.query.options(
+        joinedload(SubscriptionUpgradeRequest.utilisateur),
+        joinedload(SubscriptionUpgradeRequest.pack),
+        joinedload(SubscriptionUpgradeRequest.admin)
+    )
     
     if statut:
         query = query.filter_by(statut=statut)
     
     requests = query.order_by(SubscriptionUpgradeRequest.created_at.desc()).all()
+    print(f"Found {len(requests)} upgrade requests")
+    for req in requests:
+        print(f"Request {req.id}: user_id={req.user_id}, statut={req.statut}, pack_id={req.pack_id}")
     return jsonify({'requests': [r.to_dict() for r in requests]}), 200
 
 @admin_bp.route('/upgrade-request/<int:request_id>/approve', methods=['POST'])
 @admin_required
 def approve_upgrade_request(request_id):
     """Approve an upgrade request"""
+    print(f"Approve upgrade request called for request_id: {request_id}")
     upgrade_request = SubscriptionUpgradeRequest.query.get_or_404(request_id)
     
     if upgrade_request.statut != 'en_attente':
+        print(f"Request status is not en_attente: {upgrade_request.statut}")
         return jsonify({'error': 'Cette demande a déjà été traitée'}), 400
     
     # Cancel existing active subscription
@@ -913,6 +934,7 @@ def approve_upgrade_request(request_id):
     
     if existing:
         existing.statut = 'annule'
+        print(f"Cancelled existing subscription {existing.id}")
     
     # Create new subscription
     pack = SubscriptionPack.query.get(upgrade_request.pack_id)
@@ -935,18 +957,22 @@ def approve_upgrade_request(request_id):
     db.session.add(subscription)
     db.session.commit()
     
+    print(f"Upgrade request {request_id} approved, new subscription {subscription.id} created")
     return jsonify({'message': 'Demande approuvée', 'subscription': subscription.to_dict()}), 200
 
 @admin_bp.route('/upgrade-request/<int:request_id>/reject', methods=['POST'])
 @admin_required
 def reject_upgrade_request(request_id):
     """Reject an upgrade request"""
+    print(f"Reject upgrade request called for request_id: {request_id}")
     upgrade_request = SubscriptionUpgradeRequest.query.get_or_404(request_id)
     
     if upgrade_request.statut != 'en_attente':
+        print(f"Request status is not en_attente: {upgrade_request.statut}")
         return jsonify({'error': 'Cette demande a déjà été traitée'}), 400
     
     data = request.get_json()
+    print(f"Reject data: {data}")
     upgrade_request.statut = 'refuse'
     upgrade_request.admin_notes = data.get('admin_notes') if data else None
     upgrade_request.processed_at = datetime.utcnow()
@@ -954,5 +980,6 @@ def reject_upgrade_request(request_id):
     
     db.session.commit()
     
+    print(f"Upgrade request {request_id} rejected")
     return jsonify({'message': 'Demande refusée'}), 200
 

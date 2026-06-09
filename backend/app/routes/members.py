@@ -137,11 +137,13 @@ def get_profils():
         if profil_subscription:
             profil_subscription.check_and_handle_expiration()
             # Check if profile's pack allows WhatsApp contact visibility
-            if profil_subscription.pack.contacts_whatsapp_par_jour == 0:
+            # First discovery period gives full benefits regardless of pack quotas
+            if not profil_subscription.premiere_periode_decouverte and profil_subscription.pack.contacts_whatsapp_par_jour == 0:
                 profil_dict['contact_whatsapp'] = None
                 profil_dict['whatsapp_masked'] = True
             # Check if profile's pack allows direct call visibility
-            if profil_subscription.pack.appels_directs_par_jour == 0:
+            # First discovery period gives full benefits regardless of pack quotas
+            if not profil_subscription.premiere_periode_decouverte and profil_subscription.pack.appels_directs_par_jour == 0:
                 profil_dict['contact_direct'] = None
                 profil_dict['call_masked'] = True
         else:
@@ -232,11 +234,13 @@ def get_profils_recommandes():
         if profil_subscription:
             profil_subscription.check_and_handle_expiration()
             # Check if profile's pack allows WhatsApp contact visibility
-            if profil_subscription.pack.contacts_whatsapp_par_jour == 0:
+            # First discovery period gives full benefits regardless of pack quotas
+            if not profil_subscription.premiere_periode_decouverte and profil_subscription.pack.contacts_whatsapp_par_jour == 0:
                 profil_dict['contact_whatsapp'] = None
                 profil_dict['whatsapp_masked'] = True
             # Check if profile's pack allows direct call visibility
-            if profil_subscription.pack.appels_directs_par_jour == 0:
+            # First discovery period gives full benefits regardless of pack quotas
+            if not profil_subscription.premiere_periode_decouverte and profil_subscription.pack.appels_directs_par_jour == 0:
                 profil_dict['contact_direct'] = None
                 profil_dict['call_masked'] = True
         else:
@@ -306,11 +310,13 @@ def get_profil(user_id):
         if profil_subscription:
             profil_subscription.check_and_handle_expiration()
             # Check if profile's pack allows WhatsApp contact visibility
-            if profil_subscription.pack.contacts_whatsapp_par_jour == 0:
+            # First discovery period gives full benefits regardless of pack quotas
+            if not profil_subscription.premiere_periode_decouverte and profil_subscription.pack.contacts_whatsapp_par_jour == 0:
                 profil_dict['contact_whatsapp'] = None
                 profil_dict['whatsapp_masked'] = True
             # Check if profile's pack allows direct call visibility
-            if profil_subscription.pack.appels_directs_par_jour == 0:
+            # First discovery period gives full benefits regardless of pack quotas
+            if not profil_subscription.premiere_periode_decouverte and profil_subscription.pack.appels_directs_par_jour == 0:
                 profil_dict['contact_direct'] = None
                 profil_dict['call_masked'] = True
         else:
@@ -652,12 +658,16 @@ def purchase_subscription():
 @members_bp.route('/subscription/upgrade-request', methods=['POST'])
 def create_upgrade_request():
     """Create a subscription upgrade request"""
+    print("Upgrade request endpoint called")
     if 'user_id' not in session:
+        print("User not authenticated")
         return jsonify({'error': 'Non authentifié'}), 401
     
     data = request.get_json()
+    print(f"Request data: {data}")
     
     if not data or 'pack_id' not in data:
+        print("Pack ID missing")
         return jsonify({'error': 'Pack ID requis'}), 400
     
     pack = SubscriptionPack.query.get_or_404(data['pack_id'])
@@ -672,6 +682,7 @@ def create_upgrade_request():
     ).first()
     
     if existing_request:
+        print(f"User {session['user_id']} already has a pending request")
         return jsonify({'error': 'Vous avez déjà une demande en attente'}), 400
     
     upgrade_request = SubscriptionUpgradeRequest(
@@ -685,6 +696,7 @@ def create_upgrade_request():
     db.session.add(upgrade_request)
     db.session.commit()
     
+    print(f"Upgrade request created: {upgrade_request.id}")
     return jsonify({'message': 'Demande d\'upgrade créée', 'request': upgrade_request.to_dict()}), 201
 
 @members_bp.route('/subscription/upgrade-requests', methods=['GET'])
