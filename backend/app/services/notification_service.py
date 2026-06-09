@@ -164,3 +164,19 @@ class NotificationService:
         </html>
         """
         return NotificationService.send_email(user.email, subject, html_content)
+    
+    @staticmethod
+    def send_ad_validation_notification(ad):
+        """Envoie une notification SMS lorsque une publicité est validée"""
+        message = f"Votre publicité '{ad.titre}' a été validée par l'admin. Connectez-vous à votre espace pour payer et activer votre publicité."
+        
+        # Format Cameroun: ajouter +237 si nécessaire
+        phone = ad.numero_contact
+        if phone and not phone.startswith('+'):
+            phone = '+237' + phone
+        
+        if phone:
+            return NotificationService.send_sms(phone, message)
+        else:
+            print("Aucun numéro de contact pour la publicité - SMS non envoyé")
+            return False

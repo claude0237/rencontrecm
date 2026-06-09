@@ -313,3 +313,98 @@ def renew_advertisement(ad_id):
         'message': 'Publicité renouvelée avec succès',
         'advertisement': ad.to_dict()
     }), 200
+
+@ads_bp.route('/pub/<int:ad_id>/payer', methods=['POST'])
+def pay_for_advertisement(ad_id):
+    """Pay for a validated advertisement"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    data = request.get_json()
+    
+    ad = Advertisement.query.get(ad_id)
+    if not ad:
+        return jsonify({'error': 'Publicité non trouvée'}), 404
+    
+    if ad.utilisateur_id != session['user_id']:
+        return jsonify({'error': 'Non autorisé'}), 403
+    
+    if ad.statut != 'validee_en_attente_paiement':
+        return jsonify({'error': 'Cette publicité n\'est pas en attente de paiement'}), 400
+    
+    methode_paiement = data.get('methode_paiement')
+    
+    if methode_paiement == 'mobile_money':
+        # Mobile Money - set status to awaiting admin validation
+        if not data.get('reference_paiement'):
+            return jsonify({'error': 'Numéro de paiement requis pour Mobile Money'}), 400
+        
+        ad.statut = 'en_attente_paiement_manuel'
+        ad.methode_paiement = 'mobile_money'
+        ad.reference_paiement = data.get('reference_paiement')
+        
+        # Create admin notification for mobile money payment validation
+        try:
+            from app.models import AdminNotification
+            notification = AdminNotification(
+                type='paiement_manuel',
+                titre='Paiement Mobile Money à valider',
+                message=f'Paiement Mobile Money pour publicité "{ad.titre}" par {ad.utilisateur.nom if ad.utilisateur else "Utilisateur inconnu"}. Numéro: {ad.reference_paiement}. Montant: {ad.pack.prix if ad.pack else 0} FCFA.',
+                advertisement_id=ad.id,
+                utilisateur_id=ad.utilisateur_id
+            )
+            db.session.add(notification)
+        except Exception as e:
+            print(f"Error creating notification: {e}")
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Paiement Mobile Money enregistré. L\'administrateur validera votre paiement.',
+            'advertisement': ad.to_dict()
+        }), 200
+        
+    elif methode_paiement == 'manuel_admin':
+        # Manual admin payment - set status to awaiting admin validation
+        ad.statut = 'en_attente_paiement_manuel'
+        ad.methode_paiement = 'manuel_admin'
+        ad.reference_paiement = data.get('reference_paiement', '')
+        
+        # Create admin notification for manual payment validation
+        try:
+            from app.models import AdminNotification
+            reference_info = f" Référence: {ad.reference_paiement}" if ad.reference_paiement else ""
+            notification = AdminNotification(
+                type='paiement_manuel',
+                titre='Paiement manuel à valider',
+                message=f'Paiement manuel pour publicité "{ad.titre}" par {ad.utilisateur.nom if ad.utilisateur else "Utilisateur inconnu"}.{reference_info} Montant: {ad.pack.prix if ad.pack else 0} FCFA.',
+                advertisement_id=ad.id,
+                utilisateur_id=ad.utilisateur_id
+            )
+            db.session.add(notification)
+        except Exception as e:
+            print(f"Error creating notification: {e}")
+            # Continue without notification if there's an error
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Demande de paiement manuel enregistrée. L\'administrateur validera votre paiement.',
+            'advertisement': ad.to_dict()
+        }), 200
+        
+    elif methode_paiement == 'carte_bancaire':
+        # Credit card - placeholder for payment gateway integration
+        # For now, treat as manual validation
+        ad.statut = 'en_attente_paiement_manuel'
+        ad.methode_paiement = 'carte_bancaire'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Intégration carte bancaire à venir. Pour l\'instant, paiement en attente de validation.',
+            'advertisement': ad.to_dict()
+        }), 200
+        
+    else:
+        return jsonify({'error': 'Mode de paiement non reconnu'}), 400

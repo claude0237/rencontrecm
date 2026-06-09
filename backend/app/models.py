@@ -268,7 +268,7 @@ class Advertisement(db.Model):
     numero_contact = db.Column(db.String(50))
     whatsapp = db.Column(db.String(50))
     duree_jours = db.Column(db.Integer, nullable=False)
-    statut = db.Column(db.String(30), default='brouillon')  # brouillon, en_attente, validee_en_attente_paiement, validee, rejetee, suspendue, expiree
+    statut = db.Column(db.String(30), default='brouillon')  # brouillon, en_attente, validee_en_attente_paiement, en_attente_paiement_manuel, validee, rejetee, suspendue, expiree
     pack_id = db.Column(db.Integer, db.ForeignKey('ad_packs.id'))
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
     date_debut_validite = db.Column(db.DateTime)

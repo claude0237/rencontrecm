@@ -457,19 +457,38 @@ def get_pending_advertisements():
         ]
     }), 200
 
+@admin_bp.route('/publicites/paiements-en-attente', methods=['GET'])
+@admin_required
+def get_pending_payments():
+    """Get all advertisements awaiting manual payment validation"""
+    ads = Advertisement.query.filter_by(statut='en_attente_paiement_manuel').order_by(Advertisement.date_creation.desc()).all()
+    
+    return jsonify({
+        'advertisements': [
+            {
+                **ad.to_dict(),
+                'annonceur_nom': ad.utilisateur.nom if ad.utilisateur else None,
+                'annonceur_email': ad.utilisateur.email if ad.utilisateur else None,
+                'annonceur_telephone': ad.utilisateur.contact_direct if ad.utilisateur else None
+            }
+            for ad in ads
+        ]
+    }), 200
+
 @admin_bp.route('/publicite/<int:ad_id>/valider', methods=['POST'])
 @admin_required
 def validate_advertisement(ad_id):
     """Validate an advertisement"""
+    print(f"Validating advertisement {ad_id}")
     ad = Advertisement.query.get_or_404(ad_id)
     
     if ad.statut != 'en_attente':
+        print(f"Advertisement status is not en_attente: {ad.statut}")
         return jsonify({'error': 'Cette publicité n\'est pas en attente'}), 400
     
-    # Set validation dates
-    ad.statut = 'validee'
-    ad.date_debut_validite = datetime.utcnow()
-    ad.date_fin_validite = datetime.utcnow() + timedelta(days=ad.duree_jours)
+    # Set status to validated awaiting payment
+    ad.statut = 'validee_en_attente_paiement'
+    # Don't set validity dates yet - will be set after payment
     
     # Log validation
     from flask import session
@@ -481,6 +500,13 @@ def validate_advertisement(ad_id):
     db.session.add(history)
     
     db.session.commit()
+    
+    # Send SMS notification to user
+    try:
+        from app.services.notification_service import NotificationService
+        NotificationService.send_ad_validation_notification(ad)
+    except Exception as e:
+        print(f"Error sending SMS notification: {e}")
     
     return jsonify({'message': 'Publicité validée', 'advertisement': ad.to_dict()}), 200
 
@@ -552,9 +578,6 @@ def reactivate_advertisement(ad_id):
     # Update status
     ad.statut = 'validee'
     
-    # Update end date
-    ad.date_fin_validite = datetime.utcnow() + timedelta(days=ad.duree_jours)
-    
     # Log reactivation
     from flask import session
     history = AdValidationHistory(
@@ -567,6 +590,62 @@ def reactivate_advertisement(ad_id):
     db.session.commit()
     
     return jsonify({'message': 'Publicité réactivée', 'advertisement': ad.to_dict()}), 200
+
+@admin_bp.route('/publicite/<int:ad_id>/valider-paiement', methods=['POST'])
+@admin_required
+def validate_manual_payment(ad_id):
+    """Validate a manual payment for an advertisement"""
+    ad = Advertisement.query.get_or_404(ad_id)
+    
+    if ad.statut != 'en_attente_paiement_manuel':
+        return jsonify({'error': 'Cette publicité n\'est pas en attente de validation de paiement'}), 400
+    
+    # Set status to validated and activate
+    ad.statut = 'validee'
+    ad.date_debut_validite = datetime.utcnow()
+    ad.date_fin_validite = datetime.utcnow() + timedelta(days=ad.duree_jours)
+    ad.paiement_effectue = True
+    
+    # Log payment validation
+    from flask import session
+    history = AdValidationHistory(
+        advertisement_id=ad.id,
+        admin_id=session['user_id'],
+        action='validee'
+    )
+    db.session.add(history)
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Paiement validé et publicité activée', 'advertisement': ad.to_dict()}), 200
+
+@admin_bp.route('/publicite/<int:ad_id>/rejeter-paiement', methods=['POST'])
+@admin_required
+def reject_manual_payment(ad_id):
+    """Reject a manual payment for an advertisement"""
+    ad = Advertisement.query.get_or_404(ad_id)
+    
+    if ad.statut != 'en_attente_paiement_manuel':
+        return jsonify({'error': 'Cette publicité n\'est pas en attente de validation de paiement'}), 400
+    
+    # Set status back to awaiting payment
+    ad.statut = 'validee_en_attente_paiement'
+    ad.methode_paiement = None
+    ad.reference_paiement = None
+    
+    # Log payment rejection
+    from flask import session
+    history = AdValidationHistory(
+        advertisement_id=ad.id,
+        admin_id=session['user_id'],
+        action='rejetee',
+        motif_rejet='Paiement manuel rejeté'
+    )
+    db.session.add(history)
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Paiement rejeté, veuillez réessayer', 'advertisement': ad.to_dict()}), 200
 
 @admin_bp.route('/publicite/<int:ad_id>/supprimer', methods=['DELETE'])
 @admin_required

@@ -88,6 +88,9 @@ def get_profils():
     
     query = Utilisateur.query.filter_by(actif=True)
     
+    # Exclude admin accounts from search results
+    query = query.filter(Utilisateur.est_admin == False)
+    
     # Exclude specified user if provided
     if exclude_user_id:
         query = query.filter(Utilisateur.id != exclude_user_id)
@@ -189,6 +192,9 @@ def get_profils_recommandes():
     # First try to get profiles with same genre
     query = Utilisateur.query.filter_by(actif=True)
     
+    # Exclude admin accounts from recommended profiles
+    query = query.filter(Utilisateur.est_admin == False)
+    
     # Exclude specified user if provided
     if exclude_user_id:
         query = query.filter(Utilisateur.id != exclude_user_id)
@@ -204,6 +210,10 @@ def get_profils_recommandes():
     # If no profiles found with same genre, get all active profiles
     if not profils and user_genre:
         query = Utilisateur.query.filter_by(actif=True)
+        
+        # Exclude admin accounts from recommended profiles
+        query = query.filter(Utilisateur.est_admin == False)
+        
         # Exclude specified user if provided
         if exclude_user_id:
             query = query.filter(Utilisateur.id != exclude_user_id)

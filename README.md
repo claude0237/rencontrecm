@@ -222,6 +222,136 @@ sudo systemctl restart nginx
   - **Statistiques détaillées** : Appels, visites de profils, clics WhatsApp
   - **Notifications admin** : Alertes pour nouvelles publicités et paiements
   - **Persistance de l'état** : Menu admin et pagination sauvegardés après rafraîchissement
+  - **Validation des paiements** : Validation/rejet des paiements manuels et Mobile Money
+
+### Système de Paiement
+
+#### Méthodes de Paiement Actuelles
+
+Le système implémente actuellement trois méthodes de paiement pour les publicités:
+
+1. **Mobile Money (Orange Money / MTN Mobile Money)**
+   - L'utilisateur entre le numéro qui a effectué le paiement
+   - Le statut passe à `en_attente_paiement_manuel`
+   - Une notification admin est créée avec le numéro de paiement
+   - L'admin valide en comparant avec les reçus reçus
+   - **Note**: Actuellement manuel, prévu pour intégration API automatique
+
+2. **Paiement Manuel (Admin)**
+   - L'utilisateur demande un paiement manuel
+   - Optionnellement entre une référence de paiement
+   - Le statut passe à `en_attente_paiement_manuel`
+   - Une notification admin est créée
+   - L'admin valide après vérification du dépôt
+
+3. **Carte Bancaire**
+   - Placeholder pour intégration future avec passerelle de paiement
+   - Actuellement non implémenté
+
+#### Processus de Validation Admin
+
+Le flux de validation des paiements suit ce processus:
+
+1. **Soumission du paiement**
+   - L'utilisateur sélectionne une méthode de paiement
+   - Les données sont envoyées à `/api/v1/ads/pub/<id>/payer`
+   - Le statut de la publicité passe à `en_attente_paiement_manuel`
+   - Une notification admin est créée dans `admin_notifications`
+
+2. **Notification Admin**
+   - Type: `paiement_manuel`
+   - Contient: titre, message avec détails (numéro/référence, montant, utilisateur)
+   - Accessible depuis le tableau de bord admin
+
+3. **Validation par l'admin**
+   - L'admin consulte les paiements en attente
+   - Compare les informations avec les reçus bancaires/Mobile Money
+   - Valide ou rejette le paiement avec raison
+
+4. **Activation de la publicité**
+   - Si validé: statut passe à `validee`, dates de validité définies
+   - Si rejeté: statut passe à `rejetee`, raison enregistrée
+   - Historique de validation enregistré dans `ad_validation_history`
+
+#### Intégration Future d'API de Paiement Automatique
+
+Pour une future intégration avec les API de paiement automatique (Orange Money, MTN, etc.), voici la logique à suivre:
+
+**Architecture proposée:**
+
+1. **Configuration des API de paiement**
+   - Ajouter les clés API dans `backend/config.py` ou variables d'environnement
+   - Créer un service de paiement (`backend/app/services/payment_service.py`)
+   - Implémenter les méthodes pour chaque opérateur (Orange, MTN)
+
+2. **Modification du flux Mobile Money**
+   - Remplacer la saisie manuelle du numéro par une redirection vers l'API de paiement
+   - L'utilisateur est redirigé vers la page de paiement de l'opérateur
+   - Après paiement, l'opérateur redirige vers un webhook/callback
+
+3. **Webhook de notification de paiement**
+   - Créer un endpoint `/api/v1/payments/webhook/<operator>`
+   - Recevoir les notifications de succès/échec de l'opérateur
+   - Vérifier la signature de la notification pour la sécurité
+   - Mettre à jour automatiquement le statut de la publicité
+
+4. **Modifications du modèle**
+   - Ajouter des champs pour suivre les transactions:
+     ```python
+     # Dans Advertisement
+     transaction_id = db.Column(db.String(100))  # ID de transaction API
+     payment_status = db.Column(db.String(50))   # pending, success, failed
+     payment_response = db.Column(db.Text)       # Réponse JSON de l'API
+     ```
+
+5. **Exemple d'implémentation**
+
+   ```python
+   # backend/app/services/payment_service.py
+   class PaymentService:
+       def initiate_mobile_money_payment(self, ad, phone_number, operator):
+           """Initie un paiement Mobile Money via API"""
+           if operator == 'orange':
+               return self._initiate_orange_payment(ad, phone_number)
+           elif operator == 'mtn':
+               return self._initiate_mtn_payment(ad, phone_number)
+       
+       def _initiate_orange_payment(self, ad, phone_number):
+           """Intégration avec Orange Money API"""
+           # Appel à l'API Orange Money
+           # Retourne l'URL de paiement et transaction_id
+           pass
+       
+       def verify_payment(self, transaction_id):
+           """Vérifie le statut d'une transaction"""
+           # Appel à l'API pour vérifier le statut
+           pass
+   ```
+
+6. **Endpoint de callback**
+   ```python
+   @ads_bp.route('/payments/callback/orange', methods=['POST'])
+   def orange_payment_callback():
+       """Callback Orange Money après paiement"""
+       data = request.get_json()
+       # Vérifier la signature
+       # Mettre à jour le statut de la publicité
+       # Envoyer confirmation à l'utilisateur
+       pass
+   ```
+
+**Points clés pour l'intégration:**
+- Sécuriser les webhooks avec des signatures
+- Gérer les timeouts et les échecs de paiement
+- Logger toutes les transactions pour audit
+- Implémenter des mécanismes de retry pour les paiements en attente
+- Tester en mode sandbox avant production
+
+**Fichiers à modifier:**
+- `backend/app/routes/ads.py` - Modifier `pay_for_advertisement()`
+- `backend/app/services/payment_service.py` - Nouveau fichier
+- `backend/app/models.py` - Ajouter champs de transaction
+- `frontend/templates/main/mes_pubs.html` - Modifier l'UI pour redirection API
 
 ### Frontend
 

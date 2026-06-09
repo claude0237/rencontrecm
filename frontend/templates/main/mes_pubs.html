@@ -3,89 +3,150 @@
 {% block title %}Mes Publicités - RencontreCm{% endblock %}
 
 {% block content %}
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('mesPubs', () => ({
+        advertisements: [],
+        loading: true,
+        paymentModal: false,
+        selectedAd: null,
+        paymentMethod: '',
+        paymentReference: '',
+        paymentPhone: '',
+        init() {
+            console.log('MesPubs init called');
+            this.loadAdvertisements();
+        },
+        loadAdvertisements() {
+            this.loading = true;
+            fetch('/api/v1/ads/mes-pubs')
+                .then(r => r.json())
+                .then(data => {
+                    this.advertisements = data.advertisements;
+                    this.loading = false;
+                })
+                .catch(err => {
+                    console.error('Error loading advertisements:', err);
+                    this.loading = false;
+                });
+        },
+        getStatusColor(status) {
+            const colors = {
+                'brouillon': 'bg-gray-100 text-gray-800',
+                'en_attente': 'bg-yellow-100 text-yellow-800',
+                'validee_en_attente_paiement': 'bg-blue-100 text-blue-800',
+                'en_attente_paiement_manuel': 'bg-orange-100 text-orange-800',
+                'validee': 'bg-green-100 text-green-800',
+                'rejetee': 'bg-red-100 text-red-800',
+                'expiree': 'bg-purple-100 text-purple-800'
+            };
+            return colors[status] || 'bg-gray-100 text-gray-800';
+        },
+        getStatusLabel(status) {
+            const labels = {
+                'brouillon': 'Brouillon',
+                'en_attente': 'En attente',
+                'validee_en_attente_paiement': 'Validée - En attente de paiement',
+                'en_attente_paiement_manuel': 'En attente de validation paiement',
+                'validee': 'Validée',
+                'rejetee': 'Rejetée',
+                'expiree': 'Expirée'
+            };
+            return labels[status] || status;
+        },
+        deleteAd(ad) {
+            if (!confirm('Voulez-vous vraiment supprimer cette publicité?')) return;
+            
+            fetch(`/api/v1/ads/pub/${ad.id}`, {
+                method: 'DELETE'
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    this.advertisements = this.advertisements.filter(a => a.id !== ad.id);
+                }
+            })
+            .catch(err => {
+                console.error('Error deleting ad:', err);
+                alert('Erreur lors de la suppression');
+            });
+        },
+        renewAd(ad) {
+            if (!confirm('Voulez-vous vraiment renouveler cette publicité?')) return;
+            
+            fetch(`/api/v1/ads/pub/${ad.id}/renouveler`, {
+                method: 'POST'
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    this.loadAdvertisements();
+                }
+            })
+            .catch(err => {
+                console.error('Error renewing ad:', err);
+                alert('Erreur lors du renouvellement');
+            });
+        },
+        payForAd(ad) {
+            console.log('payForAd called with ad:', ad);
+            this.selectedAd = ad;
+            this.paymentModal = true;
+            this.paymentMethod = '';
+            this.paymentReference = '';
+            this.paymentPhone = '';
+            console.log('paymentModal set to true:', this.paymentModal);
+        },
+        processPayment() {
+            if (!this.paymentMethod) {
+                alert('Veuillez sélectionner un mode de paiement');
+                return;
+            }
+            
+            if (this.paymentMethod === 'mobile_money' && !this.paymentReference) {
+                alert('Veuillez entrer le numéro ayant effectué le paiement');
+                return;
+            }
+            
+            const paymentData = {
+                methode_paiement: this.paymentMethod,
+                reference_paiement: this.paymentReference
+            };
+            
+            fetch(`/api/v1/ads/pub/${this.selectedAd.id}/payer`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(paymentData)
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    alert('Paiement enregistré avec succès! Votre publicité sera activée après traitement.');
+                    this.paymentModal = false;
+                    this.loadAdvertisements();
+                }
+            })
+            .catch(err => {
+                console.error('Error paying for ad:', err);
+                alert('Erreur lors du paiement');
+            });
+        }
+    }));
+});
+</script>
+
 <div class="flex flex-col h-screen">
     <div class="flex-1 overflow-y-auto">
         <div class="max-w-6xl mx-auto px-4 py-8">
             <h1 class="text-4xl font-bold text-rose mb-8">Mes Publicités</h1>
             
-            <div class="bg-white rounded-lg shadow-lg p-6" x-data="{ 
-                advertisements: [],
-                loading: true,
-                init() {
-                    this.loadAdvertisements();
-                },
-                loadAdvertisements() {
-                    this.loading = true;
-                    fetch('/api/v1/ads/mes-pubs')
-                        .then(r => r.json())
-                        .then(data => {
-                            this.advertisements = data.advertisements;
-                            this.loading = false;
-                        })
-                        .catch(err => {
-                            console.error('Error loading advertisements:', err);
-                            this.loading = false;
-                        });
-                },
-                getStatusColor(status) {
-                    const colors = {
-                        'brouillon': 'bg-gray-100 text-gray-800',
-                        'en_attente': 'bg-yellow-100 text-yellow-800',
-                        'validee': 'bg-green-100 text-green-800',
-                        'rejetee': 'bg-red-100 text-red-800',
-                        'expiree': 'bg-purple-100 text-purple-800'
-                    };
-                    return colors[status] || 'bg-gray-100 text-gray-800';
-                },
-                getStatusLabel(status) {
-                    const labels = {
-                        'brouillon': 'Brouillon',
-                        'en_attente': 'En attente',
-                        'validee': 'Validée',
-                        'rejetee': 'Rejetée',
-                        'expiree': 'Expirée'
-                    };
-                    return labels[status] || status;
-                },
-                deleteAd(ad) {
-                    if (!confirm('Voulez-vous vraiment supprimer cette publicité?')) return;
-                    
-                    fetch(`/api/v1/ads/pub/${ad.id}`, {
-                        method: 'DELETE'
-                    })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.error) {
-                            alert(data.error);
-                        } else {
-                            this.advertisements = this.advertisements.filter(a => a.id !== ad.id);
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Error deleting ad:', err);
-                        alert('Erreur lors de la suppression');
-                    });
-                },
-                renewAd(ad) {
-                    if (!confirm('Voulez-vous vraiment renouveler cette publicité?')) return;
-                    
-                    fetch(`/api/v1/ads/pub/${ad.id}/renouveler`, {
-                        method: 'POST'
-                    })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.error) {
-                            alert(data.error);
-                        } else {
-                            this.loadAdvertisements();
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Error renewing ad:', err);
-                        alert('Erreur lors du renouvellement');
-                    });
-                }
-            }" x-init="init()">
+            <div class="bg-white rounded-lg shadow-lg p-6" x-data="mesPubs">
                 <div class="mb-4">
                     <a href="/creer-pub" class="bg-rose text-white px-6 py-3 rounded-lg font-semibold hover:bg-rose-dark transition inline-block">
                         + Créer une publicité
@@ -127,12 +188,84 @@
                                         <div class="flex gap-2 mt-2">
                                             <a :href="`/modifier-pub/${ad.id}`" x-show="ad.statut === 'brouillon' || ad.statut === 'en_attente'" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition text-center">Modifier</a>
                                             <button @click="deleteAd(ad)" x-show="ad.statut === 'brouillon' || ad.statut === 'en_attente'" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition">Supprimer</button>
+                                            <button @click="payForAd(ad)" x-show="ad.statut === 'validee_en_attente_paiement'" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition">Payer</button>
                                             <button @click="renewAd(ad)" x-show="ad.statut === 'expiree'" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition">Renouveler</button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </template>
+                    </div>
+                </div>
+                
+                <!-- Payment Modal -->
+                <div x-show="paymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                        <h3 class="text-xl font-bold text-charcoal mb-4">Mode de Paiement</h3>
+                        <p class="text-gray-600 mb-4">Montant à payer: <span x-text="selectedAd ? selectedAd.pack_prix + ' FCFA' : ''"></span></p>
+                        
+                        <!-- Payment Method Selection -->
+                        <div class="space-y-3 mb-4">
+                            <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" x-model="paymentMethod" value="mobile_money" class="w-4 h-4 text-rose">
+                                <div>
+                                    <span class="font-semibold">Mobile Money</span>
+                                    <p class="text-sm text-gray-500">Orange Money, MTN Mobile Money</p>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" x-model="paymentMethod" value="manuel_admin" class="w-4 h-4 text-rose">
+                                <div>
+                                    <span class="font-semibold">Paiement Manuel (Admin)</span>
+                                    <p class="text-sm text-gray-500">Validation par l'administrateur après dépôt</p>
+                                </div>
+                            </label>
+                            
+                            <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" x-model="paymentMethod" value="carte_bancaire" class="w-4 h-4 text-rose">
+                                <div>
+                                    <span class="font-semibold">Carte Bancaire</span>
+                                    <p class="text-sm text-gray-500">Visa, Mastercard</p>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <!-- Mobile Money Fields -->
+                        <div x-show="paymentMethod === 'mobile_money'" class="mb-4">
+                            <label class="block text-sm font-semibold mb-2">Numéro ayant effectué le paiement</label>
+                            <input type="text" x-model="paymentReference" placeholder="+237 6XX XXX XXX" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                        </div>
+                        
+                        <!-- Mobile Money Info -->
+                        <div x-show="paymentMethod === 'mobile_money'" class="mb-4 bg-blue-50 p-3 rounded-lg">
+                            <p class="text-sm text-blue-700">
+                                <strong>Instructions:</strong> Effectuez le paiement via Mobile Money (Orange Money/MTN) et entrez le numéro qui a effectué le paiement. L'administrateur validera votre paiement.
+                            </p>
+                        </div>
+                        
+                        <!-- Manual Admin Info -->
+                        <div x-show="paymentMethod === 'manuel_admin'" class="mb-4">
+                            <label class="block text-sm font-semibold mb-2">Référence de paiement (optionnel)</label>
+                            <input type="text" x-model="paymentReference" placeholder="Numéro de transaction, numéro de compte, etc." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose mb-3">
+                            <div class="bg-yellow-50 p-3 rounded-lg">
+                                <p class="text-sm text-yellow-700">
+                                    <strong>Instructions:</strong> Effectuez le dépôt sur le compte de l'entreprise et entrez une référence pour aider l'administrateur à valider votre paiement.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Carte Bancaire Info -->
+                        <div x-show="paymentMethod === 'carte_bancaire'" class="mb-4 bg-blue-50 p-3 rounded-lg">
+                            <p class="text-sm text-blue-700">
+                                <strong>Instructions:</strong> Vous serez redirigé vers la passerelle de paiement sécurisée.
+                            </p>
+                        </div>
+                        
+                        <div class="flex gap-4">
+                            <button @click="paymentModal = false" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition">Annuler</button>
+                            <button @click="processPayment()" class="bg-rose text-white px-4 py-2 rounded-lg hover:bg-rose-dark transition">Confirmer</button>
+                        </div>
                     </div>
                 </div>
             </div>

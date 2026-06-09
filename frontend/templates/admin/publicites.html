@@ -1,6 +1,7 @@
 <div x-data="{ 
     advertisements: [],
     pendingAds: [],
+    pendingPayments: [],
     selectedAd: null,
     showHistory: false,
     history: [],
@@ -11,6 +12,7 @@
     init() {
         this.loadAdvertisements();
         this.loadPendingAds();
+        this.loadPendingPayments();
     },
     loadAdvertisements() {
         this.loading = true;
@@ -35,9 +37,21 @@
                 console.error('Error loading pending ads:', err);
             });
     },
+    loadPendingPayments() {
+        fetch('/api/v1/admin/publicites/paiements-en-attente')
+            .then(r => r.json())
+            .then(data => {
+                this.pendingPayments = data.advertisements;
+            })
+            .catch(err => {
+                console.error('Error loading pending payments:', err);
+            });
+    },
     getFilteredAds() {
         if (this.filter === 'pending') {
             return this.pendingAds;
+        } else if (this.filter === 'payments') {
+            return this.pendingPayments;
         }
         return this.advertisements;
     },
@@ -45,6 +59,8 @@
         const colors = {
             'brouillon': 'bg-gray-100 text-gray-800',
             'en_attente': 'bg-yellow-100 text-yellow-800',
+            'validee_en_attente_paiement': 'bg-blue-100 text-blue-800',
+            'en_attente_paiement_manuel': 'bg-orange-100 text-orange-800',
             'validee': 'bg-green-100 text-green-800',
             'rejetee': 'bg-red-100 text-red-800',
             'expiree': 'bg-purple-100 text-purple-800',
@@ -56,6 +72,8 @@
         const labels = {
             'brouillon': 'Brouillon',
             'en_attente': 'En attente',
+            'validee_en_attente_paiement': 'Validée - En attente de paiement',
+            'en_attente_paiement_manuel': 'En attente de validation paiement',
             'validee': 'Validée',
             'rejetee': 'Rejetée',
             'expiree': 'Expirée',
@@ -185,10 +203,46 @@
                 console.error('Error loading history:', err);
             });
     },
-    closeHistory() {
-        this.showHistory = false;
-        this.history = [];
-    }
+    validatePayment(ad) {
+        if (!confirm('Voulez-vous vraiment valider ce paiement?')) return;
+        
+        fetch(`/api/v1/admin/publicite/${ad.id}/valider-paiement`, {
+            method: 'POST'
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                this.loadAdvertisements();
+                this.loadPendingPayments();
+            }
+        })
+        .catch(err => {
+            console.error('Error validating payment:', err);
+            alert('Erreur lors de la validation du paiement');
+        });
+    },
+    rejectPayment(ad) {
+        if (!confirm('Voulez-vous vraiment rejeter ce paiement?')) return;
+        
+        fetch(`/api/v1/admin/publicite/${ad.id}/rejeter-paiement`, {
+            method: 'POST'
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                this.loadAdvertisements();
+                this.loadPendingPayments();
+            }
+        })
+        .catch(err => {
+            console.error('Error rejecting payment:', err);
+            alert('Erreur lors du rejet du paiement');
+        });
+    },
 }">
     <h1 class="text-4xl font-bold text-rose mb-8">Gestion des Publicités</h1>
     
@@ -200,6 +254,9 @@
             </button>
             <button @click="filter = 'pending'" :class="filter === 'pending' ? 'bg-rose text-white' : 'bg-gray-200 text-charcoal hover:bg-gray-300'" class="px-4 py-2 rounded-lg transition">
                 En attente <span x-show="pendingAds.length > 0" class="ml-1 bg-yellow-500 text-white px-2 py-0.5 rounded-full text-xs" x-text="pendingAds.length"></span>
+            </button>
+            <button @click="filter = 'payments'" :class="filter === 'payments' ? 'bg-rose text-white' : 'bg-gray-200 text-charcoal hover:bg-gray-300'" class="px-4 py-2 rounded-lg transition">
+                Paiements en attente <span x-show="pendingPayments.length > 0" class="ml-1 bg-orange-500 text-white px-2 py-0.5 rounded-full text-xs" x-text="pendingPayments.length"></span>
             </button>
         </div>
     </div>
@@ -215,6 +272,22 @@
             <div class="ml-3">
                 <p class="text-sm text-yellow-700">
                     <span x-text="pendingAds.length"></span> publicité(s) en attente de validation
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pending Payments Alert -->
+    <div x-show="pendingPayments.length > 0" class="bg-orange-100 border-l-4 border-orange-500 p-4 mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-orange-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-orange-700">
+                    <span x-text="pendingPayments.length"></span> paiement(s) manuel(s) en attente de validation
                 </p>
             </div>
         </div>
@@ -272,6 +345,12 @@
                             <div class="flex gap-2">
                                 <button @click="validateAd(ad)" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition">Valider</button>
                                 <button @click="openRejectModal(ad)" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition">Rejeter</button>
+                            </div>
+                        </template>
+                        <template x-if="ad.statut === 'en_attente_paiement_manuel'">
+                            <div class="flex gap-2">
+                                <button @click="validatePayment(ad)" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 transition">Valider Paiement</button>
+                                <button @click="rejectPayment(ad)" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition">Rejeter Paiement</button>
                             </div>
                         </template>
                         <template x-if="ad.statut === 'validee'">
