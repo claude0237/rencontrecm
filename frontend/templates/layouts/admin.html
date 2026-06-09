@@ -46,7 +46,7 @@
             this.gestionPubOpen = true;
             localStorage.setItem('adminGestionPubOpen', 'true');
         }
-        if (['subscription-packs', 'user-subscriptions'].includes(section)) {
+        if (['subscription-packs', 'user-subscriptions', 'upgrade-requests'].includes(section)) {
             this.gestionAbonnementOpen = true;
             localStorage.setItem('adminGestionAbonnementOpen', 'true');
         }
@@ -206,6 +206,11 @@
                                 :class="activeSection === 'user-subscriptions' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
                                 class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
                                 👥 Abonnements Utilisateurs
+                            </button>
+                            <button @click="setActiveSection('upgrade-requests')" 
+                                :class="activeSection === 'upgrade-requests' ? 'bg-rose text-white' : 'hover:bg-gray-700'"
+                                class="w-full text-left px-4 py-2 rounded-lg transition text-sm">
+                                📨 Demandes d'Upgrade
                             </button>
                         </div>
                     </div>

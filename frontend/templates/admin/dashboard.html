@@ -1,1 +1,87 @@
 {% extends "layouts/admin.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <template x-if="activeSection === 'upgrade-requests'">
+        <div x-data="upgradeRequests()" x-init="init()">
+            {% include "admin/upgrade_requests.html" %}
+        </div>
+    </template>
+</div>
+
+<script>
+function upgradeRequests() {
+    return {
+        requests: [],
+        filter: 'all',
+        loading: false,
+        showRejectModal: false,
+        selectedRequest: null,
+        rejectReason: '',
+
+        get filteredRequests() {
+            if (this.filter === 'all') return this.requests;
+            return this.requests.filter(r => r.statut === this.filter);
+        },
+
+        init() {
+            this.loadRequests();
+        },
+
+        loadRequests() {
+            this.loading = true;
+            fetch('/api/v1/admin/upgrade-requests')
+                .then(r => r.json())
+                .then(data => {
+                    this.requests = data.requests;
+                    this.loading = false;
+                })
+                .catch(err => {
+                    console.error('Error loading requests:', err);
+                    this.loading = false;
+                });
+        },
+
+        approveRequest(requestId) {
+            if (!confirm('Voulez-vous vraiment approuver cette demande?')) return;
+            
+            fetch(`/api/v1/admin/upgrade-request/${requestId}/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert('Demande approuvée avec succès');
+                this.loadRequests();
+            })
+            .catch(err => {
+                console.error('Error approving request:', err);
+                alert('Erreur lors de l\'approbation');
+            });
+        },
+
+        rejectRequest() {
+            if (!this.selectedRequest) return;
+            
+            fetch(`/api/v1/admin/upgrade-request/${this.selectedRequest.id}/reject`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_notes: this.rejectReason })
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert('Demande refusée');
+                this.showRejectModal = false;
+                this.rejectReason = '';
+                this.selectedRequest = null;
+                this.loadRequests();
+            })
+            .catch(err => {
+                console.error('Error rejecting request:', err);
+                alert('Erreur lors du refus');
+            });
+        }
+    };
+}
+</script>
+{% endblock %}

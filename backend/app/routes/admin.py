@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app import db
-from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel, WhatsAppClick, WhatsAppSetting, Advertisement, AdPack, AdValidationHistory, AdminNotification, SubscriptionPack, UserSubscription
+from app.models import AlerteGlobale, Utilisateur, Region, Quartier, Appel, WhatsAppClick, WhatsAppSetting, Advertisement, AdPack, AdValidationHistory, AdminNotification, SubscriptionPack, UserSubscription, SubscriptionUpgradeRequest
 from app.utils import admin_required
 from datetime import datetime, timedelta
 
@@ -881,4 +881,78 @@ def get_user_subscription(user_id):
     if subscription:
         return jsonify({'subscription': subscription.to_dict()}), 200
     return jsonify({'subscription': None}), 200
+
+# Subscription Upgrade Request Management
+@admin_bp.route('/upgrade-requests', methods=['GET'])
+@admin_required
+def get_upgrade_requests():
+    """Get all upgrade requests"""
+    statut = request.args.get('statut')
+    query = SubscriptionUpgradeRequest.query
+    
+    if statut:
+        query = query.filter_by(statut=statut)
+    
+    requests = query.order_by(SubscriptionUpgradeRequest.created_at.desc()).all()
+    return jsonify({'requests': [r.to_dict() for r in requests]}), 200
+
+@admin_bp.route('/upgrade-request/<int:request_id>/approve', methods=['POST'])
+@admin_required
+def approve_upgrade_request(request_id):
+    """Approve an upgrade request"""
+    upgrade_request = SubscriptionUpgradeRequest.query.get_or_404(request_id)
+    
+    if upgrade_request.statut != 'en_attente':
+        return jsonify({'error': 'Cette demande a déjà été traitée'}), 400
+    
+    # Cancel existing active subscription
+    existing = UserSubscription.query.filter_by(
+        user_id=upgrade_request.user_id,
+        statut='actif'
+    ).first()
+    
+    if existing:
+        existing.statut = 'annule'
+    
+    # Create new subscription
+    pack = SubscriptionPack.query.get(upgrade_request.pack_id)
+    date_fin = datetime.utcnow() + timedelta(days=pack.duree_jours)
+    
+    subscription = UserSubscription(
+        user_id=upgrade_request.user_id,
+        pack_id=upgrade_request.pack_id,
+        date_debut=datetime.utcnow(),
+        date_fin=date_fin,
+        methode_paiement=upgrade_request.methode_paiement,
+        reference_paiement=upgrade_request.reference_paiement
+    )
+    
+    # Update request status
+    upgrade_request.statut = 'approuve'
+    upgrade_request.processed_at = datetime.utcnow()
+    upgrade_request.processed_by = session.get('user_id')
+    
+    db.session.add(subscription)
+    db.session.commit()
+    
+    return jsonify({'message': 'Demande approuvée', 'subscription': subscription.to_dict()}), 200
+
+@admin_bp.route('/upgrade-request/<int:request_id>/reject', methods=['POST'])
+@admin_required
+def reject_upgrade_request(request_id):
+    """Reject an upgrade request"""
+    upgrade_request = SubscriptionUpgradeRequest.query.get_or_404(request_id)
+    
+    if upgrade_request.statut != 'en_attente':
+        return jsonify({'error': 'Cette demande a déjà été traitée'}), 400
+    
+    data = request.get_json()
+    upgrade_request.statut = 'refuse'
+    upgrade_request.admin_notes = data.get('admin_notes') if data else None
+    upgrade_request.processed_at = datetime.utcnow()
+    upgrade_request.processed_by = session.get('user_id')
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Demande refusée'}), 200
 

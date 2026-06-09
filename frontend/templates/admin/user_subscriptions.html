@@ -1,9 +1,7 @@
-{% extends "layouts/admin.html" %}
-
 {% block title %}Gestion des Abonnements Utilisateurs - RencontresCM{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-y-auto max-h-screen" x-data="userSubscriptions()" x-init="init()">
     <h1 class="text-4xl font-bold text-rose mb-8">Gestion des Abonnements Utilisateurs</h1>
 
     <!-- Assign Subscription Button -->
@@ -100,9 +98,14 @@
             <form @submit.prevent="assignSubscription()">
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Utilisateur (Email)</label>
-                        <input type="email" x-model="assignForm.user_email" required
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Utilisateur</label>
+                        <select x-model="assignForm.user_id" required
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                            <option value="">Sélectionner un utilisateur</option>
+                            <template x-for="user in users" :key="user.id">
+                                <option :value="user.id" x-text="user.nom + ' (' + user.email + ')'"></option>
+                            </template>
+                        </select>
                     </div>
                     
                     <div>
@@ -203,6 +206,7 @@ function userSubscriptions() {
     return {
         subscriptions: [],
         packs: [],
+        users: [],
         loading: false,
         assigning: false,
         updating: false,
@@ -211,7 +215,7 @@ function userSubscriptions() {
         showEditModal: false,
         editingSubscription: null,
         assignForm: {
-            user_email: '',
+            user_id: '',
             pack_id: '',
             methode_paiement: 'manuel',
             reference_paiement: ''
@@ -224,6 +228,7 @@ function userSubscriptions() {
         init() {
             this.loadSubscriptions();
             this.loadPacks();
+            this.loadUsers();
         },
         loadSubscriptions() {
             this.loading = true;
@@ -252,46 +257,39 @@ function userSubscriptions() {
                     console.error('Error loading packs:', err);
                 });
         },
+        loadUsers() {
+            fetch('/api/v1/admin/utilisateurs')
+                .then(r => r.json())
+                .then(data => {
+                    this.users = data.utilisateurs;
+                })
+                .catch(err => {
+                    console.error('Error loading users:', err);
+                });
+        },
         assignSubscription() {
             this.assigning = true;
             
-            // First get user ID from email
-            fetch(`/api/v1/admin/utilisateurs?search=${this.assignForm.user_email}`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.utilisateurs.length === 0) {
-                        alert('Utilisateur non trouvé');
-                        this.assigning = false;
-                        return;
-                    }
-                    
-                    const user = data.utilisateurs[0];
-                    
-                    fetch('/api/v1/admin/user-subscription', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            user_id: user.id,
-                            pack_id: this.assignForm.pack_id,
-                            methode_paiement: this.assignForm.methode_paiement,
-                            reference_paiement: this.assignForm.reference_paiement
-                        })
-                    })
-                    .then(r => r.json())
-                    .then(data => {
-                        this.assigning = false;
-                        this.closeAssignModal();
-                        this.loadSubscriptions();
-                    })
-                    .catch(err => {
-                        console.error('Error assigning subscription:', err);
-                        this.assigning = false;
-                    });
+            fetch('/api/v1/admin/user-subscription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: this.assignForm.user_id,
+                    pack_id: this.assignForm.pack_id,
+                    methode_paiement: this.assignForm.methode_paiement,
+                    reference_paiement: this.assignForm.reference_paiement
                 })
-                .catch(err => {
-                    console.error('Error finding user:', err);
-                    this.assigning = false;
-                });
+            })
+            .then(r => r.json())
+            .then(data => {
+                this.assigning = false;
+                this.closeAssignModal();
+                this.loadSubscriptions();
+            })
+            .catch(err => {
+                console.error('Error assigning subscription:', err);
+                this.assigning = false;
+            });
         },
         editSubscription(subscription) {
             this.editingSubscription = subscription;
@@ -365,3 +363,4 @@ function userSubscriptions() {
     };
 }
 </script>
+{% endblock %}

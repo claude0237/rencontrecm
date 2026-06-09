@@ -27,13 +27,14 @@
     loading: false,
     sidebarOpen: false,
     init() {
-        this.loadCurrentUser();
-        this.loadRegions();
-        this.getUserLocation();
-        this.loadAdvertisements();
+        this.loadCurrentUser().then(() => {
+            this.loadRegions();
+            this.getUserLocation();
+            this.loadAdvertisements();
+        });
     },
     loadCurrentUser() {
-        fetch('/api/v1/auth/me')
+        return fetch('/api/v1/auth/me')
             .then(r => r.json())
             .then(data => {
                 if (data.user) {
@@ -76,6 +77,7 @@
         if (this.userLocation.lon) params.append('lon', this.userLocation.lon);
         params.append('page', this.pagination.currentPage);
         params.append('limit', this.pagination.limit);
+        if (this.currentUser) params.append('exclude_user_id', this.currentUser.id);
         
         fetch(`/api/v1/profils?${params}`)
             .then(r => r.json())
@@ -127,6 +129,7 @@
         if (this.userLocation.lat) params.append('lat', this.userLocation.lat);
         if (this.userLocation.lon) params.append('lon', this.userLocation.lon);
         params.append('limit', 10);
+        if (this.currentUser) params.append('exclude_user_id', this.currentUser.id);
         
         fetch(`/api/v1/profils/recommandes?${params}`)
             .then(r => r.json())

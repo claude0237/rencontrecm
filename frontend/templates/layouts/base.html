@@ -67,9 +67,14 @@
     alertes: [], 
     currentAlertIndex: 0,
     mobileMenuOpen: false,
+    subscription: null,
+    loadingSubscription: false,
     init() {
         this.loadAlertes();
         setInterval(() => this.nextAlert(), 5000);
+        {% if session.get('user_id') %}
+        this.loadSubscription();
+        {% endif %}
     },
     loadAlertes() {
         fetch('/api/v1/admin/alertes')
@@ -83,6 +88,19 @@
         if (this.alertes.length > 1) {
             this.currentAlertIndex = (this.currentAlertIndex + 1) % this.alertes.length;
         }
+    },
+    loadSubscription() {
+        this.loadingSubscription = true;
+        fetch('/api/v1/my-subscription')
+            .then(r => r.json())
+            .then(data => {
+                this.subscription = data.subscription;
+                this.loadingSubscription = false;
+            })
+            .catch(err => {
+                console.error('Error loading subscription:', err);
+                this.loadingSubscription = false;
+            });
     }
 }">
     <nav class="bg-charcoal text-cream shadow-lg fixed w-full top-0 left-0 z-50">
@@ -91,11 +109,45 @@
                 <a href="/" class="text-2xl font-bold text-rose">RencontresCM</a>
                 
                 <!-- Desktop Navigation -->
-                <div class="hidden md:flex space-x-4">
+                <div class="hidden md:flex space-x-4 items-center">
                     <a href="/" class="hover:text-rose transition">Accueil</a>
                     {% if session.get('user_id') %}
-                        <a href="/profil" class="hover:text-rose transition">Profil</a>
-                        <a href="/mes-pubs" class="hover:text-rose transition">Mes Publicités</a>
+                        <div class="relative group">
+                            <a href="/profil" class="hover:text-rose transition flex items-center">
+                                Profil
+                                <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </a>
+                            <div class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl py-3 px-4 hidden group-hover:block z-50">
+                                <template x-if="loadingSubscription">
+                                    <div>
+                                        <p class="text-gray-600 text-sm">Chargement...</p>
+                                    </div>
+                                </template>
+                                <template x-if="!loadingSubscription && subscription && subscription.pack">
+                                    <div>
+                                        <p class="text-charcoal font-bold mb-2" x-text="subscription.pack.nom"></p>
+                                        <div class="text-sm text-gray-600 space-y-1">
+                                            <p>Profils: <span x-text="subscription.pack.profils_consultables_par_jour === -1 ? 'Illimité' : subscription.pack.profils_consultables_par_jour"></span> (<span x-text="subscription.profils_consultes_aujourdhui"></span> utilisés)</p>
+                                            <p>WhatsApp: <span x-text="subscription.pack.contacts_whatsapp_par_jour === -1 ? 'Illimité' : subscription.pack.contacts_whatsapp_par_jour"></span> (<span x-text="subscription.contacts_whatsapp_aujourdhui"></span> utilisés)</p>
+                                            <p>Appels: <span x-text="subscription.pack.appels_directs_par_jour === -1 ? 'Illimité' : subscription.pack.appels_directs_par_jour"></span> (<span x-text="subscription.appels_directs_aujourdhui"></span> utilisés)</p>
+                                            <p class="text-xs text-gray-500 mt-2">Fin: <span x-text="new Date(subscription.date_fin).toLocaleDateString('fr-FR')"></span></p>
+                                        </div>
+                                        <a href="/abonnements" class="block mt-3 text-rose text-sm hover:underline">Voir les packs</a>
+                                    </div>
+                                </template>
+                                <template x-if="!loadingSubscription && (!subscription || !subscription.pack)">
+                                    <div>
+                                        <p class="text-gray-600 text-sm">Aucun abonnement actif</p>
+                                        <a href="/abonnements" class="block mt-2 text-rose text-sm hover:underline">S'abonner</a>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        {% if not session.get('is_admin') %}
+                            <a href="/mes-pubs" class="hover:text-rose transition">Mes Publicités</a>
+                        {% endif %}
                         {% if session.get('is_admin') %}
                             <a href="/admin/dashboard" class="hover:text-rose transition">Admin</a>
                         {% endif %}
@@ -128,7 +180,9 @@
                     <a href="/" @click="mobileMenuOpen = false" class="hover:text-rose transition py-2">Accueil</a>
                     {% if session.get('user_id') %}
                         <a href="/profil" @click="mobileMenuOpen = false" class="hover:text-rose transition py-2">Profil</a>
-                        <a href="/mes-pubs" @click="mobileMenuOpen = false" class="hover:text-rose transition py-2">Mes Publicités</a>
+                        {% if not session.get('is_admin') %}
+                            <a href="/mes-pubs" @click="mobileMenuOpen = false" class="hover:text-rose transition py-2">Mes Publicités</a>
+                        {% endif %}
                         {% if session.get('is_admin') %}
                             <a href="/admin/dashboard" @click="mobileMenuOpen = false" class="hover:text-rose transition py-2">Admin</a>
                         {% endif %}

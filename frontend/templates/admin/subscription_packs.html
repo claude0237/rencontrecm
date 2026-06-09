@@ -1,9 +1,7 @@
-{% extends "layouts/admin.html" %}
-
 {% block title %}Gestion des Packs d'Abonnement - RencontresCM{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-y-auto max-h-screen" x-data="subscriptionPacks()" x-init="init()">
     <h1 class="text-4xl font-bold text-rose mb-8">Gestion des Packs d'Abonnement</h1>
 
     <!-- Create Pack Button -->
@@ -297,3 +295,4 @@ function subscriptionPacks() {
     };
 }
 </script>
+{% endblock %}

@@ -411,6 +411,25 @@ class UserSubscription(db.Model):
     def is_active(self):
         return self.statut == 'actif' and self.date_fin > datetime.utcnow()
     
+    def check_and_handle_expiration(self):
+        """Check if subscription is expired and handle rollback to free pack"""
+        if self.statut == 'actif' and self.date_fin <= datetime.utcnow():
+            self.statut = 'expire'
+            db.session.commit()
+            # Assign free pack automatically
+            free_pack = SubscriptionPack.query.filter_by(niveau='gratuit').first()
+            if free_pack:
+                new_subscription = UserSubscription(
+                    user_id=self.user_id,
+                    pack_id=free_pack.id,
+                    date_fin=datetime.utcnow() + timedelta(days=free_pack.duree_jours),
+                    statut='actif'
+                )
+                db.session.add(new_subscription)
+                db.session.commit()
+                return new_subscription
+        return None
+    
     def reset_daily_quotas(self):
         now = datetime.utcnow()
         if self.dernier_reset_quotas.date() < now.date():
@@ -471,5 +490,45 @@ class UserSubscription(db.Model):
             'reference_paiement': self.reference_paiement,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
+        }
+
+class SubscriptionUpgradeRequest(db.Model):
+    __tablename__ = 'subscription_upgrade_request'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
+    pack_id = db.Column(db.Integer, db.ForeignKey('subscription_pack.id'), nullable=False)
+    methode_paiement = db.Column(db.Enum('manuel', 'mobile', 'carte'), default='manuel')
+    statut = db.Column(db.Enum('en_attente', 'approuve', 'refuse'), default='en_attente')
+    reference_paiement = db.Column(db.String(100))
+    message = db.Column(db.Text)
+    admin_notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    processed_at = db.Column(db.DateTime)
+    processed_by = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'))
+    
+    utilisateur = db.relationship('Utilisateur', foreign_keys=[user_id], backref='upgrade_requests', lazy=True)
+    pack = db.relationship('SubscriptionPack', backref='upgrade_requests', lazy=True)
+    admin = db.relationship('Utilisateur', foreign_keys=[processed_by], backref='processed_upgrade_requests', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'user_nom': self.utilisateur.nom if self.utilisateur else None,
+            'user_email': self.utilisateur.email if self.utilisateur else None,
+            'pack_id': self.pack_id,
+            'pack': self.pack.to_dict() if self.pack else None,
+            'methode_paiement': self.methode_paiement,
+            'statut': self.statut,
+            'reference_paiement': self.reference_paiement,
+            'message': self.message,
+            'admin_notes': self.admin_notes,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat(),
+            'processed_at': self.processed_at.isoformat() if self.processed_at else None,
+            'processed_by': self.processed_by,
+            'admin_nom': self.admin.nom if self.admin else None
         }
 

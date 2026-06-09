@@ -1,15 +1,25 @@
 from flask import Blueprint, request, jsonify, current_app, session
 from app import db
-from app.models import Region, Quartier, Utilisateur, Appel, WhatsAppClick, WhatsAppSetting, SubscriptionPack, UserSubscription
+from app.models import Region, Quartier, Utilisateur, Appel, WhatsAppClick, WhatsAppSetting, SubscriptionPack, UserSubscription, SubscriptionUpgradeRequest
 import json
 import os
 import math
+import re
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 
 members_bp = Blueprint('members', __name__)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def mask_phone_numbers(text):
+    """Mask phone numbers in text"""
+    if not text:
+        return text
+    # Mask phone numbers (Cameroon format: +237, 6XX, etc.)
+    pattern = r'(\+?237)?[0-9\s\-\(\)]{8,15}'
+    masked = re.sub(pattern, '***', text)
+    return masked
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -61,8 +71,26 @@ def get_profils():
     limit = request.args.get('limit', 9, type=int)
     user_lat = request.args.get('lat', type=float)
     user_lon = request.args.get('lon', type=float)
+    exclude_user_id = request.args.get('exclude_user_id', type=int)
+    
+    # Get current user subscription if authenticated
+    current_user_id = session.get('user_id')
+    current_subscription = None
+    if current_user_id:
+        subscription = UserSubscription.query.filter_by(
+            user_id=current_user_id,
+            statut='actif'
+        ).first()
+        if subscription:
+            subscription.check_and_handle_expiration()
+            if subscription.is_active():
+                current_subscription = subscription
     
     query = Utilisateur.query.filter_by(actif=True)
+    
+    # Exclude specified user if provided
+    if exclude_user_id:
+        query = query.filter(Utilisateur.id != exclude_user_id)
     
     if region_id:
         query = query.filter_by(region_id=region_id)
@@ -94,6 +122,35 @@ def get_profils():
         
         profil_dict = profil.to_dict()
         profil_dict['distance'] = distance
+        
+        # Mask phone numbers in name and description
+        profil_dict['nom'] = mask_phone_numbers(profil_dict['nom'])
+        profil_dict['description'] = mask_phone_numbers(profil_dict['description'])
+        
+        # Mask contact info based on profile's subscription pack
+        # Get the profile's subscription to check if they allow contact visibility
+        profil_subscription = UserSubscription.query.filter_by(
+            user_id=profil.id,
+            statut='actif'
+        ).first()
+        
+        if profil_subscription:
+            profil_subscription.check_and_handle_expiration()
+            # Check if profile's pack allows WhatsApp contact visibility
+            if profil_subscription.pack.contacts_whatsapp_par_jour == 0:
+                profil_dict['contact_whatsapp'] = None
+                profil_dict['whatsapp_masked'] = True
+            # Check if profile's pack allows direct call visibility
+            if profil_subscription.pack.appels_directs_par_jour == 0:
+                profil_dict['contact_direct'] = None
+                profil_dict['call_masked'] = True
+        else:
+            # No active subscription = no contact visibility
+            profil_dict['contact_whatsapp'] = None
+            profil_dict['whatsapp_masked'] = True
+            profil_dict['contact_direct'] = None
+            profil_dict['call_masked'] = True
+        
         profils_with_distance.append(profil_dict)
     
     return jsonify({
@@ -112,9 +169,27 @@ def get_profils_recommandes():
     user_lon = request.args.get('lon', type=float)
     user_genre = request.args.get('genre')
     limit = request.args.get('limit', 10, type=int)
+    exclude_user_id = request.args.get('exclude_user_id', type=int)
+    
+    # Get current user subscription if authenticated
+    current_user_id = session.get('user_id')
+    current_subscription = None
+    if current_user_id:
+        subscription = UserSubscription.query.filter_by(
+            user_id=current_user_id,
+            statut='actif'
+        ).first()
+        if subscription:
+            subscription.check_and_handle_expiration()
+            if subscription.is_active():
+                current_subscription = subscription
     
     # First try to get profiles with same genre
     query = Utilisateur.query.filter_by(actif=True)
+    
+    # Exclude specified user if provided
+    if exclude_user_id:
+        query = query.filter(Utilisateur.id != exclude_user_id)
     
     if user_genre:
         query = query.filter_by(genre=user_genre)
@@ -127,6 +202,9 @@ def get_profils_recommandes():
     # If no profiles found with same genre, get all active profiles
     if not profils and user_genre:
         query = Utilisateur.query.filter_by(actif=True)
+        # Exclude specified user if provided
+        if exclude_user_id:
+            query = query.filter(Utilisateur.id != exclude_user_id)
         query = query.order_by(Utilisateur.nombre_visites.desc())
         profils = query.limit(limit * 2).all()
     
@@ -139,6 +217,35 @@ def get_profils_recommandes():
         
         profil_dict = profil.to_dict()
         profil_dict['distance'] = distance
+        
+        # Mask phone numbers in name and description
+        profil_dict['nom'] = mask_phone_numbers(profil_dict['nom'])
+        profil_dict['description'] = mask_phone_numbers(profil_dict['description'])
+        
+        # Mask contact info based on profile's subscription pack
+        # Get the profile's subscription to check if they allow contact visibility
+        profil_subscription = UserSubscription.query.filter_by(
+            user_id=profil.id,
+            statut='actif'
+        ).first()
+        
+        if profil_subscription:
+            profil_subscription.check_and_handle_expiration()
+            # Check if profile's pack allows WhatsApp contact visibility
+            if profil_subscription.pack.contacts_whatsapp_par_jour == 0:
+                profil_dict['contact_whatsapp'] = None
+                profil_dict['whatsapp_masked'] = True
+            # Check if profile's pack allows direct call visibility
+            if profil_subscription.pack.appels_directs_par_jour == 0:
+                profil_dict['contact_direct'] = None
+                profil_dict['call_masked'] = True
+        else:
+            # No active subscription = no contact visibility
+            profil_dict['contact_whatsapp'] = None
+            profil_dict['whatsapp_masked'] = True
+            profil_dict['contact_direct'] = None
+            profil_dict['call_masked'] = True
+        
         profils_with_distance.append(profil_dict)
     
     # Sort by distance if available, otherwise by visits
@@ -150,11 +257,32 @@ def get_profils_recommandes():
 
 @members_bp.route('/profil/<int:user_id>', methods=['GET'])
 def get_profil(user_id):
+    from flask import session
+    
     user_lat = request.args.get('lat', type=float)
     user_lon = request.args.get('lon', type=float)
     
     user = Utilisateur.query.get_or_404(user_id)
     profil_dict = user.to_dict()
+    
+    # Get current user subscription if authenticated
+    current_user_id = session.get('user_id')
+    current_subscription = None
+    is_own_profile = current_user_id == user_id
+    
+    if current_user_id:
+        subscription = UserSubscription.query.filter_by(
+            user_id=current_user_id,
+            statut='actif'
+        ).first()
+        if subscription:
+            subscription.check_and_handle_expiration()
+            if subscription.is_active():
+                current_subscription = subscription
+    
+    # Add subscription info to profile
+    if is_own_profile and current_subscription:
+        profil_dict['subscription'] = current_subscription.to_dict()
     
     # Calculate distance if user location is provided
     distance = None
@@ -163,12 +291,64 @@ def get_profil(user_id):
     
     profil_dict['distance'] = distance
     
+    # Mask phone numbers in name and description
+    profil_dict['nom'] = mask_phone_numbers(profil_dict['nom'])
+    profil_dict['description'] = mask_phone_numbers(profil_dict['description'])
+    
+    # Mask contact info based on profile's subscription pack (unless it's own profile)
+    if not is_own_profile:
+        # Get the profile's subscription to check if they allow contact visibility
+        profil_subscription = UserSubscription.query.filter_by(
+            user_id=user_id,
+            statut='actif'
+        ).first()
+        
+        if profil_subscription:
+            profil_subscription.check_and_handle_expiration()
+            # Check if profile's pack allows WhatsApp contact visibility
+            if profil_subscription.pack.contacts_whatsapp_par_jour == 0:
+                profil_dict['contact_whatsapp'] = None
+                profil_dict['whatsapp_masked'] = True
+            # Check if profile's pack allows direct call visibility
+            if profil_subscription.pack.appels_directs_par_jour == 0:
+                profil_dict['contact_direct'] = None
+                profil_dict['call_masked'] = True
+        else:
+            # No active subscription = no contact visibility
+            profil_dict['contact_whatsapp'] = None
+            profil_dict['whatsapp_masked'] = True
+            profil_dict['contact_direct'] = None
+            profil_dict['call_masked'] = True
+    
     return jsonify({'profil': profil_dict}), 200
 
 @members_bp.route('/profil/<int:user_id>/visite', methods=['POST'])
 def increment_visite(user_id):
+    from flask import session
+    
     user = Utilisateur.query.get_or_404(user_id)
     user.nombre_visites = (user.nombre_visites or 0) + 1
+    
+    # Track profile view in subscription if authenticated
+    current_user_id = session.get('user_id')
+    if current_user_id and current_user_id != user_id:
+        subscription = UserSubscription.query.filter_by(
+            user_id=current_user_id,
+            statut='actif'
+        ).first()
+        if subscription:
+            subscription.check_and_handle_expiration()
+            if subscription.is_active():
+                subscription.reset_daily_quotas()
+                if subscription.can_view_profile():
+                    subscription.increment_profile_view()
+                else:
+                    return jsonify({
+                        'error': 'Quota de consultations de profils atteint pour aujourd\'hui',
+                        'quota_used': subscription.profils_consultes_aujourdhui,
+                        'quota_limit': subscription.pack.profils_consultables_par_jour
+                    }), 403
+    
     db.session.commit()
     return jsonify({'message': 'Visite enregistrée', 'nombre_visites': user.nombre_visites}), 200
 
@@ -406,12 +586,20 @@ def get_my_subscription():
     if 'user_id' not in session:
         return jsonify({'error': 'Non authentifié'}), 401
     
-    subscription = UserSubscription.query.filter_by(
+    from sqlalchemy.orm import joinedload
+    subscription = UserSubscription.query.options(
+        joinedload(UserSubscription.pack)
+    ).filter_by(
         user_id=session['user_id'],
         statut='actif'
     ).first()
     
     if subscription:
+        # Check and handle expiration
+        subscription.check_and_handle_expiration()
+        # Check if still active after expiration check
+        if subscription.statut != 'actif':
+            return jsonify({'subscription': None}), 200
         # Reset daily quotas if needed
         subscription.reset_daily_quotas()
         return jsonify({'subscription': subscription.to_dict()}), 200
@@ -459,4 +647,55 @@ def purchase_subscription():
     db.session.commit()
     
     return jsonify({'message': 'Abonnement créé avec succès', 'subscription': subscription.to_dict()}), 201
+
+# Subscription Upgrade Request endpoints
+@members_bp.route('/subscription/upgrade-request', methods=['POST'])
+def create_upgrade_request():
+    """Create a subscription upgrade request"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    data = request.get_json()
+    
+    if not data or 'pack_id' not in data:
+        return jsonify({'error': 'Pack ID requis'}), 400
+    
+    pack = SubscriptionPack.query.get_or_404(data['pack_id'])
+    
+    if not pack.actif:
+        return jsonify({'error': 'Ce pack n\'est pas disponible'}), 400
+    
+    # Check if user already has a pending request
+    existing_request = SubscriptionUpgradeRequest.query.filter_by(
+        user_id=session['user_id'],
+        statut='en_attente'
+    ).first()
+    
+    if existing_request:
+        return jsonify({'error': 'Vous avez déjà une demande en attente'}), 400
+    
+    upgrade_request = SubscriptionUpgradeRequest(
+        user_id=session['user_id'],
+        pack_id=data['pack_id'],
+        methode_paiement=data.get('methode_paiement', 'manuel'),
+        reference_paiement=data.get('reference_paiement'),
+        message=data.get('message')
+    )
+    
+    db.session.add(upgrade_request)
+    db.session.commit()
+    
+    return jsonify({'message': 'Demande d\'upgrade créée', 'request': upgrade_request.to_dict()}), 201
+
+@members_bp.route('/subscription/upgrade-requests', methods=['GET'])
+def get_my_upgrade_requests():
+    """Get current user's upgrade requests"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    requests = SubscriptionUpgradeRequest.query.filter_by(
+        user_id=session['user_id']
+    ).order_by(SubscriptionUpgradeRequest.created_at.desc()).all()
+    
+    return jsonify({'requests': [r.to_dict() for r in requests]}), 200
 

@@ -175,6 +175,17 @@ def create_app(config_class=Config):
         if not user or not user.est_admin:
             return redirect('/')
         return render_template('admin/user_subscriptions.html')
+
+    @app.route('/admin/upgrade-requests')
+    def admin_upgrade_requests():
+        from flask import render_template, session, redirect
+        if 'user_id' not in session:
+            return redirect('/login')
+        from app.models import Utilisateur
+        user = Utilisateur.query.get(session['user_id'])
+        if not user or not user.est_admin:
+            return redirect('/')
+        return render_template('admin/upgrade_requests.html')
     
     @app.route('/pub/<int:ad_id>')
     def pub_details(ad_id):

@@ -157,6 +157,36 @@
     </div>
 </div>
 
+<!-- Payment Method Modal -->
+<div x-show="showPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-xl font-bold text-charcoal mb-4">Choisir le mode de paiement</h3>
+        <p class="text-gray-600 mb-4" x-text="'Pack: ' + selectedPack?.nom + ' - ' + selectedPack?.prix + ' FCFA'"></p>
+        
+        <div class="space-y-3">
+            <button @click="payWithMobileMoney('Orange Money')" 
+                class="w-full bg-orange-500 text-white px-4 py-3 rounded-lg hover:bg-orange-600 transition flex items-center justify-center">
+                📱 Orange Money
+            </button>
+            <button @click="payWithMobileMoney('MTN Mobile Money')" 
+                class="w-full bg-yellow-500 text-white px-4 py-3 rounded-lg hover:bg-yellow-600 transition flex items-center justify-center">
+                📱 MTN Mobile Money
+            </button>
+            <button @click="payManually()" 
+                class="w-full bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600 transition flex items-center justify-center">
+                📝 Demande manuelle
+            </button>
+        </div>
+        
+        <div class="mt-4">
+            <button @click="showPaymentModal = false" 
+                class="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition">
+                Annuler
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 function abonnements() {
     return {
@@ -165,6 +195,8 @@ function abonnements() {
         loadingSubscription: false,
         loadingPacks: false,
         purchasing: false,
+        showPaymentModal: false,
+        selectedPack: null,
         init() {
             this.loadMySubscription();
             this.loadPacks();
@@ -198,13 +230,24 @@ function abonnements() {
         purchasePack(pack) {
             if (this.subscription?.pack_id === pack.id) return;
             
-            if (!confirm(`Voulez-vous vraiment souscrire au pack ${pack.nom} pour ${pack.prix} FCFA?`)) return;
+            // Show payment method selection modal
+            this.selectedPack = pack;
+            this.showPaymentModal = true;
+        },
+        requestUpgrade(pack) {
+            if (this.subscription?.pack_id === pack.id) return;
+            
+            if (!confirm(`Voulez-vous envoyer une demande d'upgrade pour le pack ${pack.nom}? L'admin traitera votre demande manuellement.`)) return;
             
             this.purchasing = true;
-            fetch('/api/v1/members/subscription/purchase', {
+            fetch('/api/v1/members/subscription/upgrade-request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pack_id: pack.id })
+                body: JSON.stringify({ 
+                    pack_id: pack.id,
+                    methode_paiement: 'manuel',
+                    message: `Demande d'upgrade vers ${pack.nom}`
+                })
             })
             .then(r => r.json())
             .then(data => {
@@ -212,15 +255,28 @@ function abonnements() {
                 if (data.error) {
                     alert(data.error);
                 } else {
-                    alert('Abonnement créé avec succès!');
+                    alert('Demande d\'upgrade envoyée avec succès! L\'admin traitera votre demande.');
                     this.loadMySubscription();
                 }
             })
             .catch(err => {
-                console.error('Error purchasing subscription:', err);
+                console.error('Error requesting upgrade:', err);
                 this.purchasing = false;
-                alert('Erreur lors de l\'achat de l\'abonnement');
+                alert('Erreur lors de l\'envoi de la demande d\'upgrade');
             });
+        },
+        payWithMobileMoney(method) {
+            if (!this.selectedPack) return;
+            
+            // Placeholder for mobile money integration
+            alert(`Intégration ${method} en cours de développement. Pour l'instant, utilisez l'option "Demande manuelle".`);
+            this.showPaymentModal = false;
+        },
+        payManually() {
+            if (!this.selectedPack) return;
+            
+            this.showPaymentModal = false;
+            this.requestUpgrade(this.selectedPack);
         },
         formatDate(dateStr) {
             const date = new Date(dateStr);
