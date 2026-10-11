@@ -6,8 +6,7 @@ class Config:
     # Support pour MySQL ou SQLite
     # Pour MySQL: mysql+pymysql://user:password@localhost/db_name
     # Pour SQLite: sqlite:///rencontres_cm.db
-    #$#SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///rencontres_cm.db'
-    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:ncd@172.19.14.29/rencontres_cm'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///rencontres_cm.db'
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SESSION_COOKIE_SAMESITE = 'Lax'

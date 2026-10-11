@@ -73,20 +73,16 @@ python run.py init-db
 
 Cela va :
 - Créer les tables
+- Exécuter automatiquement les migrations SQL (sécurité, photos multiples)
 - Ajouter les 10 régions du Cameroun comme villes principales
 - Ajouter au moins 5 communes/arrondissements pour Douala et Yaoundé
 - Créer un compte admin : admin@rencontres.cm / Cm2026!Admin
 
-7. Exécuter les scripts de migration pour les fonctionnalités de sécurité :
-```bash
-mysql -u root -p rencontres_cm < backend/add_password_resets_table.sql
-mysql -u root -p rencontres_cm < backend/add_security_fields.sql
-```
-
-Ces scripts ajoutent :
+Les migrations SQL sont exécutées automatiquement, notamment :
 - La table `password_resets` pour la gestion des codes de réinitialisation
 - Les champs de sécurité `wave_count`, `last_attempt_at` pour le suivi des tentatives
 - Les champs `disabled_reason`, `disabled_at` pour le suivi des comptes désactivés
+- Le support de photos multiples pour les publicités (champs `nombre_photos_max`, `photos`, `photo_principale`)
 
 ## Lancement
 
@@ -207,6 +203,12 @@ sudo systemctl restart nginx
   - Cooldown de 30 minutes après 3 tentatives échouées
   - Désactivation automatique après 3 vagues de tentatives échouées
 - **Profils** : CRUD complet, photos multiples, photo principale, compteur de visites
+- **Publicités** :
+  - Photos multiples avec sélection de photo principale
+  - Limitation du nombre de photos configurable par pack (admin)
+  - Visionneuse/lightbox pour navigation entre photos
+  - Compatibilité arrière avec publicités à une seule image
+  - Upload via caméra ou galerie (mobile-friendly)
 - **Géolocalisation** : Calcul de distance entre utilisateurs, tracking de position
 - **Régions et Communes** : API pour les villes et quartiers du Cameroun
 - **Profils recommandés** : Algorithme basé sur le genre, les visites et la distance
@@ -218,7 +220,7 @@ sudo systemctl restart nginx
   - Gestion des alertes globales (bannière défilante)
   - Gestion des comptes désactivés (réactivation, affichage des raisons)
   - **Gestion des publicités** : Validation, rejet avec raison, suspension, suppression
-  - **Gestion des packs publicitaires** : CRUD complet pour les packs d'annonces
+  - **Gestion des packs publicitaires** : CRUD complet pour les packs d'annonces avec configuration du nombre max de photos
   - **Statistiques détaillées** : Appels, visites de profils, clics WhatsApp
   - **Notifications admin** : Alertes pour nouvelles publicités et paiements
   - **Persistance de l'état** : Menu admin et pagination sauvegardés après rafraîchissement
@@ -228,25 +230,22 @@ sudo systemctl restart nginx
 
 #### Méthodes de Paiement Actuelles
 
-Le système implémente actuellement trois méthodes de paiement pour les publicités:
+Le système implémente actuellement une méthode de paiement active pour les publicités:
 
-1. **Mobile Money (Orange Money / MTN Mobile Money)**
+1. **Mobile Money (Orange Money / MTN Mobile Money)** ✅ **ACTIF**
    - L'utilisateur entre le numéro qui a effectué le paiement
    - Le statut passe à `en_attente_paiement_manuel`
    - Une notification admin est créée avec le numéro de paiement
    - L'admin valide en comparant avec les reçus reçus
    - **Note**: Actuellement manuel, prévu pour intégration API automatique
 
-2. **Paiement Manuel (Admin)**
-   - L'utilisateur demande un paiement manuel
-   - Optionnellement entre une référence de paiement
-   - Le statut passe à `en_attente_paiement_manuel`
-   - Une notification admin est créée
-   - L'admin valide après vérification du dépôt
+2. **Paiement Manuel (Admin)** ⚠️ **TEMPORAIREMENT DÉSACTIVÉ**
+   - Option de dépôt manuel désactivée dans l'interface
+   - Prévue pour réactivation future après intégration avec système bancaire
 
-3. **Carte Bancaire**
+3. **Carte Bancaire** ⚠️ **TEMPORAIREMENT DÉSACTIVÉ**
    - Placeholder pour intégration future avec passerelle de paiement
-   - Actuellement non implémenté
+   - Interface désactivée en attente d'intégration
 
 #### Processus de Validation Admin
 
@@ -368,19 +367,29 @@ Pour une future intégration avec les API de paiement automatique (Orange Money,
 - **Section Publicités** : Affichage des publicités avec défilement automatique lent
 - **Détails des publicités** : Page de détail avec boutons d'appel et WhatsApp
 - **Scrollbars optimisés** : Hauteur 70vh sur les pages admin pour afficher plus de contenu
+- **Upload mobile-friendly** : Boutons Caméra/Galerie pour les images (profil et publicités)
+- **Visionneuse de photos** : Lightbox avec navigation pour profils et publicités
+- **Liste limitée** : Affichage de 4 pubs max dans "Mes publicités" avec scroll
 
 ### Fonctionnalités Utilisateur
 
 - Inscription avec photo
 - Édition de profil (informations, photos, photo principale)
+- **Upload mobile-friendly** : Choix entre caméra et galerie pour les photos
 - Géolocalisation automatique
 - Affichage de distance entre utilisateurs
 - Compteur de visites de profil
 - Statut en ligne
 - Recherche par ville, genre, âge, commune
-- **Création de publicités** : Upload d'image, sélection de pack, validation par admin
+- **Création de publicités** :
+  - Upload de photos multiples avec sélection de photo principale
+  - Choix entre caméra et galerie (mobile-friendly)
+  - Sélection de pack avec validation du nombre de photos
+  - Durée déterminée automatiquement par le pack (non modifiable)
+  - Validation par admin
 - **Affichage des publicités** : Bandeau défilant avec publicités validées
 - **Contact via publicités** : Boutons d'appel et WhatsApp sur les détails des publicités
+- **Visionneuse de photos** : Lightbox avec navigation pour profils et publicités
 
 ## Compte Admin
 
@@ -402,8 +411,8 @@ Pour une future intégration avec les API de paiement automatique (Orange Money,
 - **quartier** : Communes/arrondissements
 - **alerte_globale** : Alertes pour la bannière
 - **password_resets** : Codes de réinitialisation de mot de passe
-- **advertisement** : Publicités avec image, statut, pack, historique de validation
-- **ad_pack** : Packs publicitaires (prix, durée, nombre de publicités)
+- **advertisement** : Publicités avec photos multiples, photo principale, statut, pack, historique de validation
+- **ad_pack** : Packs publicitaires (prix, durée, nombre de publicités, nombre de photos max)
 - **ad_validation_history** : Historique des validations de publicités
 
 ### Colonnes utilisateur
