@@ -21,6 +21,8 @@
         limit: 6
     },
     userLocation: { lat: null, lon: null },
+    lightboxOpen: false,
+    currentPhotoIndex: 0,
     formData: {
         nom: '',
         age: '',
@@ -143,20 +145,34 @@
             .catch(err => console.error('Error loading quartiers:', err));
     },
     getUserLocation() {
+        // Load profile immediately without waiting for GPS
+        this.loadProfil();
+        
+        // Then try to get location for distance calculation
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    this.userLocation.lat = position.coords.latitude;
-                    this.userLocation.lon = position.coords.longitude;
-                    this.loadProfil();
+                    const newLat = position.coords.latitude;
+                    const newLon = position.coords.longitude;
+                    
+                    // Only reload if location actually changed
+                    if (this.userLocation.lat !== newLat || this.userLocation.lon !== newLon) {
+                        this.userLocation.lat = newLat;
+                        this.userLocation.lon = newLon;
+                        // Reload profile with correct distance
+                        this.loadProfil();
+                    }
                 },
                 (error) => {
                     console.log('Erreur de géolocalisation:', error);
-                    this.loadProfil();
+                    // Profile already loaded without distance
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
                 }
             );
-        } else {
-            this.loadProfil();
         }
     },
     loadSimilarProfiles() {
@@ -355,6 +371,25 @@
             console.error('Error sending WhatsApp:', err);
             alert('Erreur lors de l\'envoi WhatsApp');
         });
+    },
+    openLightbox(index) {
+        this.currentPhotoIndex = index;
+        this.lightboxOpen = true;
+        document.body.style.overflow = 'hidden';
+    },
+    closeLightbox() {
+        this.lightboxOpen = false;
+        document.body.style.overflow = 'auto';
+    },
+    nextPhoto() {
+        if (this.profil.photos && this.profil.photos.length > 0) {
+            this.currentPhotoIndex = (this.currentPhotoIndex + 1) % this.profil.photos.length;
+        }
+    },
+    prevPhoto() {
+        if (this.profil.photos && this.profil.photos.length > 0) {
+            this.currentPhotoIndex = (this.currentPhotoIndex - 1 + this.profil.photos.length) % this.profil.photos.length;
+        }
     }
 }" x-init="init()">
     <div x-show="loading" class="text-center py-12">
@@ -451,7 +486,7 @@
                             <h3 class="font-bold text-charcoal mb-2 text-sm md:text-base">Photos</h3>
                             <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                                 <template x-for="(photo, index) in profil.photos" :key="index">
-                                    <img :src="photo" :alt="'Photo ' + (index + 1)" class="w-full h-32 md:h-48 object-cover rounded-lg cursor-pointer hover:opacity-80 transition">
+                                    <img :src="photo" :alt="'Photo ' + (index + 1)" @click="openLightbox(index)" class="w-full h-32 md:h-48 object-cover rounded-lg cursor-pointer hover:opacity-80 transition">
                                 </template>
                             </div>
                         </div>
@@ -553,7 +588,22 @@
                         
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-charcoal mb-1">Photos</label>
-                            <input type="file" multiple accept="image/*" @change="uploadPhotos($event)" :disabled="uploading" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                            
+                            <!-- Hidden file inputs -->
+                            <input type="file" id="cameraInput" accept="image/*" capture="environment" multiple @change="uploadPhotos($event)" :disabled="uploading" class="hidden">
+                            <input type="file" id="galleryInput" accept="image/*" multiple @change="uploadPhotos($event)" :disabled="uploading" class="hidden">
+                            
+                            <!-- Selection buttons -->
+                            <div class="flex gap-4 mb-2">
+                                <button @click="document.getElementById('cameraInput').click()" :disabled="uploading" class="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center justify-center gap-2 disabled:opacity-50">
+                                    <span class="text-lg">📷</span>
+                                    <span>Caméra</span>
+                                </button>
+                                <button @click="document.getElementById('galleryInput').click()" :disabled="uploading" class="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition flex items-center justify-center gap-2 disabled:opacity-50">
+                                    <span class="text-lg">🖼️</span>
+                                    <span>Galerie</span>
+                                </button>
+                            </div>
                             <p x-show="uploading" class="text-sm text-gray-500 mt-1">Upload en cours...</p>
                         </div>
                         
@@ -656,6 +706,41 @@
                 class="px-4 py-2 bg-rose text-white rounded-lg hover:bg-rose-dark transition disabled:opacity-50 disabled:cursor-not-allowed">
                 Suivant
             </button>
+        </div>
+    </div>
+    
+    <!-- Lightbox Modal -->
+    <div x-show="lightboxOpen" x-transition.opacity.duration.300ms 
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90"
+         @click.self="closeLightbox()" @keydown.escape.window="closeLightbox()">
+        
+        <!-- Close button -->
+        <button @click="closeLightbox()" class="absolute top-4 right-4 text-white text-4xl hover:text-gray-300 transition z-10">
+            &times;
+        </button>
+        
+        <!-- Previous button -->
+        <button @click.stop="prevPhoto()" class="absolute left-4 text-white text-5xl hover:text-gray-300 transition z-10">
+            &#10094;
+        </button>
+        
+        <!-- Image -->
+        <div class="max-w-5xl max-h-screen p-4">
+            <template x-if="profil.photos && profil.photos.length > 0">
+                <img :src="profil.photos[currentPhotoIndex]" 
+                     :alt="'Photo ' + (currentPhotoIndex + 1)" 
+                     class="max-w-full max-h-screen object-contain rounded-lg">
+            </template>
+        </div>
+        
+        <!-- Next button -->
+        <button @click.stop="nextPhoto()" class="absolute right-4 text-white text-5xl hover:text-gray-300 transition z-10">
+            &#10095;
+        </button>
+        
+        <!-- Photo counter -->
+        <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-lg bg-black bg-opacity-50 px-4 py-2 rounded-full">
+            <span x-text="(currentPhotoIndex + 1) + ' / ' + (profil.photos ? profil.photos.length : 0)"></span>
         </div>
     </div>
     

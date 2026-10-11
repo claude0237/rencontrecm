@@ -243,6 +243,7 @@ class AdPack(db.Model):
     description = db.Column(db.Text)
     prix = db.Column(db.Float, nullable=False)
     duree_jours = db.Column(db.Integer, nullable=False)
+    nombre_photos_max = db.Column(db.Integer, default=1)  # Nombre max de photos par annonce
     actif = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -253,6 +254,7 @@ class AdPack(db.Model):
             'description': self.description,
             'prix': self.prix,
             'duree_jours': self.duree_jours,
+            'nombre_photos_max': self.nombre_photos_max,
             'actif': self.actif,
             'created_at': self.created_at.isoformat()
         }
@@ -264,7 +266,9 @@ class Advertisement(db.Model):
     utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id'), nullable=False)
     titre = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    image_url = db.Column(db.String(500))
+    image_url = db.Column(db.String(500))  # Gardé pour compatibilité (photo principale)
+    photos = db.Column(db.Text)  # JSON array of photo URLs
+    photo_principale = db.Column(db.Integer, default=0)  # Index of main photo in photos array
     numero_contact = db.Column(db.String(50))
     whatsapp = db.Column(db.String(50))
     duree_jours = db.Column(db.Integer, nullable=False)
@@ -280,12 +284,25 @@ class Advertisement(db.Model):
     validation_history = db.relationship('AdValidationHistory', backref='advertisement', lazy=True, cascade='all, delete-orphan')
     
     def to_dict(self):
+        photos_list = []
+        if self.photos:
+            try:
+                photos_list = json.loads(self.photos)
+            except:
+                photos_list = []
+        
+        # Fallback to image_url if photos array is empty (for backward compatibility)
+        if not photos_list and self.image_url:
+            photos_list = [self.image_url]
+        
         return {
             'id': self.id,
             'utilisateur_id': self.utilisateur_id,
             'titre': self.titre,
             'description': self.description,
             'image_url': self.image_url,
+            'photos': photos_list,
+            'photo_principale': self.photo_principale,
             'numero_contact': self.numero_contact,
             'whatsapp': self.whatsapp,
             'duree_jours': self.duree_jours,

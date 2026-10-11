@@ -3,6 +3,7 @@ from app import db
 from app.models import Advertisement, AdPack, Utilisateur
 from werkzeug.utils import secure_filename
 import os
+import json
 from datetime import datetime, timedelta
 from flask import session
 
@@ -28,7 +29,14 @@ def get_my_advertisements():
         return jsonify({'error': 'Non authentifié'}), 401
     
     user_id = session['user_id']
-    ads = Advertisement.query.filter_by(utilisateur_id=user_id).order_by(Advertisement.date_creation.desc()).all()
+    limit = request.args.get('limit', 4, type=int)
+    
+    query = Advertisement.query.filter_by(utilisateur_id=user_id).order_by(Advertisement.date_creation.desc())
+    
+    if limit:
+        query = query.limit(limit)
+    
+    ads = query.all()
     
     return jsonify({
         'advertisements': [ad.to_dict() for ad in ads]
@@ -74,12 +82,24 @@ def create_advertisement():
     
     user_id = session['user_id']
     
+    # Validate photo count if pack is specified
+    if data.get('pack_id'):
+        pack = AdPack.query.get(data['pack_id'])
+        if pack:
+            photos = data.get('photos', [])
+            if len(photos) > pack.nombre_photos_max:
+                return jsonify({
+                    'error': f'Nombre maximum de photos dépassé. Maximum autorisé: {pack.nombre_photos_max}'
+                }), 400
+    
     # Create advertisement
     ad = Advertisement(
         utilisateur_id=user_id,
         titre=data['titre'],
         description=data['description'],
-        image_url=data.get('image_url'),
+        image_url=data.get('image_url'),  # Keep for backward compatibility
+        photos=json.dumps(data.get('photos', [])) if data.get('photos') else None,
+        photo_principale=data.get('photo_principale', 0),
         numero_contact=data.get('numero_contact'),
         whatsapp=data.get('whatsapp'),
         duree_jours=data.get('duree_jours', 7),
@@ -131,6 +151,45 @@ def upload_ad_image_temp():
     return jsonify({
         'message': 'Image téléchargée avec succès',
         'image_url': image_url
+    }), 200
+
+@ads_bp.route('/pub/images', methods=['POST'])
+def upload_ad_images_temp():
+    """Upload multiple images for advertisement (temporary, before ad creation)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Non authentifié'}), 401
+    
+    if 'images' not in request.files:
+        return jsonify({'error': 'Aucune image fournie'}), 400
+    
+    files = request.files.getlist('images')
+    if not files or files[0].filename == '':
+        return jsonify({'error': 'Aucun fichier sélectionné'}), 400
+    
+    # Use absolute path to frontend static folder
+    upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), '../../frontend/static/uploads/ads')
+    os.makedirs(upload_folder, exist_ok=True)
+    
+    uploaded_urls = []
+    
+    for file in files:
+        if not allowed_file(file.filename):
+            return jsonify({'error': f'Format de fichier non autorisé: {file.filename}. Formats acceptés: png, jpg, jpeg, gif, webp'}), 400
+        
+        filename = secure_filename(f"temp_{session['user_id']}_{file.filename}")
+        file_path = os.path.join(upload_folder, filename)
+        
+        try:
+            file.save(file_path)
+            image_url = f"/static/uploads/ads/{filename}"
+            uploaded_urls.append(image_url)
+        except Exception as e:
+            print(f"Error saving file {file.filename}: {e}")
+            return jsonify({'error': f'Erreur lors de la sauvegarde de l\'image: {str(e)}'}), 500
+    
+    return jsonify({
+        'message': f'{len(uploaded_urls)} image(s) téléchargée(s) avec succès',
+        'image_urls': uploaded_urls
     }), 200
 
 @ads_bp.route('/pub/<int:ad_id>/image', methods=['POST'])
@@ -198,6 +257,14 @@ def update_advertisement(ad_id):
     if ad.statut not in ['brouillon', 'en_attente']:
         return jsonify({'error': 'Impossible de modifier une publicité validée'}), 400
     
+    # Validate photo count if pack is specified and photos are being updated
+    if data.get('photos') is not None and ad.pack_id:
+        pack = AdPack.query.get(ad.pack_id)
+        if pack and len(data['photos']) > pack.nombre_photos_max:
+            return jsonify({
+                'error': f'Nombre maximum de photos dépassé. Maximum autorisé: {pack.nombre_photos_max}'
+            }), 400
+    
     # Update fields
     if 'titre' in data:
         ad.titre = data['titre']
@@ -205,6 +272,10 @@ def update_advertisement(ad_id):
         ad.description = data['description']
     if 'image_url' in data:
         ad.image_url = data['image_url']
+    if 'photos' in data:
+        ad.photos = json.dumps(data['photos']) if data['photos'] else None
+    if 'photo_principale' in data:
+        ad.photo_principale = data['photo_principale']
     if 'numero_contact' in data:
         ad.numero_contact = data['numero_contact']
     if 'whatsapp' in data:

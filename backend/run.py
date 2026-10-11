@@ -2,14 +2,34 @@ import click
 from flask.cli import with_appcontext
 from app import create_app, db
 from app.models import Region, Quartier, Utilisateur
+import os
 
-app = create_app()
-
-@app.cli.command()
-@with_appcontext
 def init_db():
     """Initialize the database with tables and seed data."""
     db.create_all()
+    
+    # Run SQL migrations if they exist
+    migration_files = [
+        'add_password_resets_table.sql',
+        'add_security_fields.sql',
+        'add_ad_photos_support.sql'
+    ]
+    
+    for migration_file in migration_files:
+        migration_path = os.path.join(os.path.dirname(__file__), migration_file)
+        if os.path.exists(migration_path):
+            try:
+                with open(migration_path, 'r', encoding='utf-8') as f:
+                    sql_content = f.read()
+                    # Split by semicolon and execute each statement
+                    statements = [s.strip() for s in sql_content.split(';') if s.strip()]
+                    for statement in statements:
+                        db.session.execute(statement)
+                    db.session.commit()
+                    click.echo(f'Migration {migration_file} executed successfully!')
+            except Exception as e:
+                db.session.rollback()
+                click.echo(f'Warning: Migration {migration_file} failed (may already be applied): {e}')
     
     # Add 10 regions of Cameroon
     regions_data = [
@@ -59,6 +79,7 @@ def init_db():
             region_id=douala.id,
             quartier_id=Quartier.query.filter_by(region_id=douala.id).first().id,
             description='Compte administrateur',
+            contact_direct='691234567',
             est_admin=True,
             actif=True
         )
@@ -68,8 +89,6 @@ def init_db():
     
     click.echo('Database initialized successfully!')
 
-@app.cli.command()
-@with_appcontext
 def drop_db():
     """Drop all database tables."""
     db.drop_all()
@@ -78,10 +97,28 @@ def drop_db():
 if __name__ == '__main__':
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == 'init-db':
+        app = create_app()
         with app.app_context():
             init_db()
+        sys.exit(0)
     elif len(sys.argv) > 1 and sys.argv[1] == 'drop-db':
+        app = create_app()
         with app.app_context():
             drop_db()
+        sys.exit(0)
     else:
+        app = create_app()
+        
+        @app.cli.command()
+        @with_appcontext
+        def init_db_cli():
+            """Initialize the database with tables and seed data."""
+            init_db()
+        
+        @app.cli.command()
+        @with_appcontext
+        def drop_db_cli():
+            """Drop all database tables."""
+            drop_db()
+        
         app.run(debug=True)

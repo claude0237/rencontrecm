@@ -13,11 +13,14 @@
         form: {
             titre: '',
             description: '',
-            image_url: '',
+            photos: [],
+            photo_principale: 0,
             numero_contact: '',
             whatsapp: '',
             duree_jours: 7
         },
+        cameraInput: null,
+        galleryInput: null,
         loading: true,
         saving: false,
         uploading: false,
@@ -36,7 +39,8 @@
                     if (this.ad) {
                         this.form.titre = this.ad.titre;
                         this.form.description = this.ad.description;
-                        this.form.image_url = this.ad.image_url;
+                        this.form.photos = this.ad.photos || [];
+                        this.form.photo_principale = this.ad.photo_principale || 0;
                         this.form.numero_contact = this.ad.numero_contact;
                         this.form.whatsapp = this.ad.whatsapp;
                         this.form.duree_jours = this.ad.duree_jours;
@@ -66,17 +70,27 @@
             this.form.duree_jours = pack.duree_jours;
         },
         handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+            
+            // Get the current pack to check limit
+            const currentPack = this.packs.find(p => p.id === this.selectedPack);
+            if (currentPack) {
+                const maxPhotos = currentPack.nombre_photos_max || 1;
+                if (this.form.photos.length + files.length > maxPhotos) {
+                    alert(`Nombre maximum de photos dépassé. Maximum autorisé: ${maxPhotos}`);
+                    return;
+                }
+            }
             
             this.uploading = true;
             const formData = new FormData();
-            formData.append('image', file);
             
-            const url = window.location.pathname;
-            const adId = url.split('/').pop();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('images', files[i]);
+            }
             
-            fetch(`/api/v1/ads/pub/${adId}/image`, {
+            fetch('/api/v1/ads/pub/images', {
                 method: 'POST',
                 body: formData
             })
@@ -85,15 +99,25 @@
                 if (data.error) {
                     alert(data.error);
                 } else {
-                    this.form.image_url = data.image_url;
+                    this.form.photos = [...this.form.photos, ...data.image_urls];
                 }
                 this.uploading = false;
+                event.target.value = '';
             })
             .catch(err => {
-                console.error('Error uploading image:', err);
-                alert('Erreur lors du téléchargement de l\'image');
+                console.error('Error uploading images:', err);
+                alert('Erreur lors du téléchargement des images');
                 this.uploading = false;
             });
+        },
+        removePhoto(index) {
+            this.form.photos.splice(index, 1);
+            if (this.form.photo_principale >= this.form.photos.length) {
+                this.form.photo_principale = Math.max(0, this.form.photos.length - 1);
+            }
+        },
+        setMainPhoto(index) {
+            this.form.photo_principale = index;
         },
         updateAd() {
             if (!this.form.titre || !this.form.description) {
@@ -112,7 +136,8 @@
                 body: JSON.stringify({
                     titre: this.form.titre,
                     description: this.form.description,
-                    image_url: this.form.image_url,
+                    photos: this.form.photos,
+                    photo_principale: this.form.photo_principale,
                     numero_contact: this.form.numero_contact,
                     whatsapp: this.form.whatsapp,
                     duree_jours: this.form.duree_jours,
@@ -175,13 +200,55 @@
                 </div>
                 
                 <div class="mb-4">
-                    <label class="block text-sm font-semibold text-charcoal mb-2">Image</label>
-                    <input type="file" @change="handleImageUpload($event)" accept="image/*"
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
-                    <div x-show="uploading" class="mt-2 text-sm text-gray-500">Téléchargement...</div>
-                    <div x-show="form.image_url" class="mt-2">
-                        <img :src="form.image_url" alt="Preview" class="w-32 h-32 object-cover rounded-lg">
+                    <label class="block text-sm font-semibold text-charcoal mb-2">
+                        Photos
+                        <template x-if="selectedPack">
+                            <span class="text-gray-500 font-normal ml-2" x-text="'(' + form.photos.length + '/' + (packs.find(p => p.id === selectedPack)?.nombre_photos_max || 1) + ' - Max)'"></span>
+                        </template>
+                        <template x-if="!selectedPack">
+                            <span class="text-gray-500 font-normal ml-2">(Sélectionnez un pack)</span>
+                        </template>
+                    </label>
+                    
+                    <!-- Hidden file inputs -->
+                    <input type="file" id="cameraInput" accept="image/*" capture="environment" multiple @change="handleImageUpload($event)" class="hidden">
+                    <input type="file" id="galleryInput" accept="image/*" multiple @change="handleImageUpload($event)" class="hidden">
+                    
+                    <!-- Selection buttons -->
+                    <div class="flex gap-4 mb-3">
+                        <button @click="document.getElementById('cameraInput').click()" class="flex-1 bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition flex items-center justify-center gap-2">
+                            <span class="text-xl">📷</span>
+                            <span>Caméra</span>
+                        </button>
+                        <button @click="document.getElementById('galleryInput').click()" class="flex-1 bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition flex items-center justify-center gap-2">
+                            <span class="text-xl">🖼️</span>
+                            <span>Galerie</span>
+                        </button>
                     </div>
+                    <p class="text-xs text-gray-500 mb-2">Vous pouvez sélectionner plusieurs photos en une seule fois</p>
+                    <div x-show="uploading" class="mt-2 text-sm text-gray-500">Téléchargement...</div>
+                    
+                    <!-- Photo Grid -->
+                    <div x-show="form.photos.length > 0" class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <template x-for="(photo, index) in form.photos" :key="index">
+                            <div class="relative group">
+                                <img :src="photo" :alt="'Photo ' + (index + 1)" 
+                                     :class="form.photo_principale === index ? 'ring-4 ring-rose' : ''"
+                                     class="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-80"
+                                     @click="setMainPhoto(index)">
+                                <div x-show="form.photo_principale === index" class="absolute top-2 left-2 bg-rose text-white text-xs px-2 py-1 rounded">
+                                    Principale
+                                </div>
+                                <button @click="removePhoto(index)" 
+                                        class="absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 transition">
+                                    ×
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                    <template x-if="selectedPack && form.photos.length >= (packs.find(p => p.id === selectedPack)?.nombre_photos_max || 1)">
+                        <p class="text-xs text-orange-600 mt-2 font-semibold">Nombre maximum de photos atteint</p>
+                    </template>
                 </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -200,10 +267,17 @@
                 </div>
                 
                 <div class="mb-6">
-                    <label class="block text-sm font-semibold text-charcoal mb-2">Durée souhaitée</label>
-                    <input type="number" x-model="form.duree_jours" min="1" max="90"
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose"
-                           placeholder="Nombre de jours">
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Durée de la publicité</label>
+                    <template x-if="selectedPack">
+                        <div class="bg-gray-50 px-4 py-2 rounded-lg">
+                            <span class="text-gray-700" x-text="form.duree_jours + ' jours (déterminé par le pack ' + (packs.find(p => p.id === selectedPack)?.nom || 'sélectionné') + ')'"></span>
+                        </div>
+                    </template>
+                    <template x-if="!selectedPack">
+                        <div class="bg-gray-50 px-4 py-2 rounded-lg text-gray-500">
+                            Sélectionnez un pack pour voir la durée
+                        </div>
+                    </template>
                 </div>
                 
                 <div class="flex gap-4">

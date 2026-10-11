@@ -8,6 +8,8 @@
         <div class="bg-white rounded-lg shadow-lg p-6" x-data="{ 
         advertisement: null,
         loading: true,
+        lightboxOpen: false,
+        currentPhotoIndex: 0,
         init() {
             this.loadAdvertisement();
         },
@@ -23,6 +25,25 @@
                     console.error('Error loading advertisement:', err);
                     this.loading = false;
                 });
+        },
+        openLightbox(index) {
+            this.currentPhotoIndex = index;
+            this.lightboxOpen = true;
+            document.body.style.overflow = 'hidden';
+        },
+        closeLightbox() {
+            this.lightboxOpen = false;
+            document.body.style.overflow = 'auto';
+        },
+        nextPhoto() {
+            if (this.advertisement.photos && this.advertisement.photos.length > 0) {
+                this.currentPhotoIndex = (this.currentPhotoIndex + 1) % this.advertisement.photos.length;
+            }
+        },
+        prevPhoto() {
+            if (this.advertisement.photos && this.advertisement.photos.length > 0) {
+                this.currentPhotoIndex = (this.currentPhotoIndex - 1 + this.advertisement.photos.length) % this.advertisement.photos.length;
+            }
         }
     }" x-init="init()">
         <div x-show="loading" class="text-center py-8 text-gray-500">
@@ -32,9 +53,36 @@
         <div x-show="!loading && advertisement">
             <a href="/" class="inline-block mb-4 text-rose hover:underline">← Retour à l'accueil</a>
             
-            <div x-show="advertisement.image_url" class="mb-6">
-                <img :src="advertisement.image_url" :alt="advertisement.titre" class="w-full h-64 object-cover rounded-lg">
-            </div>
+            <!-- Main Photo -->
+            <template x-if="advertisement.photos && advertisement.photos.length > 0">
+                <div class="mb-6">
+                    <img :src="advertisement.photos[advertisement.photo_principale || 0]" :alt="advertisement.titre" 
+                         class="w-full h-64 object-cover rounded-lg cursor-pointer hover:opacity-90"
+                         @click="openLightbox(advertisement.photo_principale || 0)">
+                </div>
+                
+                <!-- Photo Gallery -->
+                <template x-if="advertisement.photos.length > 1">
+                    <div class="mb-6">
+                        <h3 class="text-lg font-bold text-charcoal mb-3">Galerie de photos</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <template x-for="(photo, index) in advertisement.photos" :key="index">
+                                <img :src="photo" :alt="'Photo ' + (index + 1)"
+                                     :class="advertisement.photo_principale === index ? 'ring-4 ring-rose' : ''"
+                                     class="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-80"
+                                     @click="openLightbox(index)">
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </template>
+            
+            <!-- Fallback for single image_url (backward compatibility) -->
+            <template x-if="(!advertisement.photos || advertisement.photos.length === 0) && advertisement.image_url">
+                <div class="mb-6">
+                    <img :src="advertisement.image_url" :alt="advertisement.titre" class="w-full h-64 object-cover rounded-lg">
+                </div>
+            </template>
             
             <h1 class="text-3xl font-bold text-charcoal mb-4" x-text="advertisement.titre"></h1>
             
@@ -55,6 +103,41 @@
                         💬 WhatsApp
                     </a>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Lightbox Modal -->
+        <div x-show="lightboxOpen" x-transition.opacity.duration.300ms 
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90"
+             @click.self="closeLightbox()" @keydown.escape.window="closeLightbox()">
+            
+            <!-- Close button -->
+            <button @click="closeLightbox()" class="absolute top-4 right-4 text-white text-4xl hover:text-gray-300 transition z-10">
+                &times;
+            </button>
+            
+            <!-- Previous button -->
+            <button @click.stop="prevPhoto()" class="absolute left-4 text-white text-5xl hover:text-gray-300 transition z-10">
+                &#10094;
+            </button>
+            
+            <!-- Image -->
+            <div class="max-w-5xl max-h-screen p-4">
+                <template x-if="advertisement.photos && advertisement.photos.length > 0">
+                    <img :src="advertisement.photos[currentPhotoIndex]" 
+                         :alt="'Photo ' + (currentPhotoIndex + 1)" 
+                         class="max-w-full max-h-screen object-contain rounded-lg">
+                </template>
+            </div>
+            
+            <!-- Next button -->
+            <button @click.stop="nextPhoto()" class="absolute right-4 text-white text-5xl hover:text-gray-300 transition z-10">
+                &#10095;
+            </button>
+            
+            <!-- Photo counter -->
+            <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-lg bg-black bg-opacity-50 px-4 py-2 rounded-full">
+                <span x-text="(currentPhotoIndex + 1) + ' / ' + (advertisement.photos ? advertisement.photos.length : 0)"></span>
             </div>
         </div>
         

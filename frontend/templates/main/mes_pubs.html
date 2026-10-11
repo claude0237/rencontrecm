@@ -19,7 +19,7 @@ document.addEventListener('alpine:init', () => {
         },
         loadAdvertisements() {
             this.loading = true;
-            fetch('/api/v1/ads/mes-pubs')
+            fetch('/api/v1/ads/mes-pubs?limit=4')
                 .then(r => r.json())
                 .then(data => {
                     this.advertisements = data.advertisements;
@@ -166,8 +166,20 @@ document.addEventListener('alpine:init', () => {
                         <template x-for="ad in advertisements" :key="ad.id">
                             <div class="border rounded-lg p-4 hover:bg-gray-50 transition">
                                 <div class="flex items-start gap-4">
-                                    <div x-show="ad.image_url" class="w-32 h-32 flex-shrink-0">
-                                        <img :src="ad.image_url" :alt="ad.titre" class="w-full h-full object-cover rounded-lg">
+                                    <div class="w-32 h-32 flex-shrink-0">
+                                        <template x-if="ad.photos && ad.photos.length > 0">
+                                            <img :src="ad.photos[ad.photo_principale || 0]" :alt="ad.titre" class="w-full h-full object-cover rounded-lg">
+                                        </template>
+                                        <template x-if="!ad.photos || ad.photos.length === 0">
+                                            <template x-if="ad.image_url">
+                                                <img :src="ad.image_url" :alt="ad.titre" class="w-full h-full object-cover rounded-lg">
+                                            </template>
+                                            <template x-if="!ad.image_url">
+                                                <div class="w-full h-full bg-gradient-to-br from-rose to-rose-light flex items-center justify-center rounded-lg">
+                                                    <span class="text-white text-4xl font-bold" x-text="ad.titre.charAt(0)"></span>
+                                                </div>
+                                            </template>
+                                        </template>
                                     </div>
                                     <div class="flex-1">
                                         <h3 class="text-xl font-bold text-charcoal mb-2" x-text="ad.titre"></h3>
@@ -202,7 +214,10 @@ document.addEventListener('alpine:init', () => {
                 <div x-show="paymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
                         <h3 class="text-xl font-bold text-charcoal mb-4">Mode de Paiement</h3>
-                        <p class="text-gray-600 mb-4">Montant à payer: <span x-text="selectedAd ? selectedAd.pack_prix + ' FCFA' : ''"></span></p>
+                        <div x-show="selectedAd" class="mb-4 p-3 bg-gray-50 rounded-lg">
+                            <p class="font-semibold text-charcoal" x-text="selectedAd.titre"></p>
+                            <p class="text-gray-600" x-text="'Montant: ' + (selectedAd.pack_prix || '') + ' FCFA'"></p>
+                        </div>
                         
                         <!-- Payment Method Selection -->
                         <div class="space-y-3 mb-4">
@@ -214,19 +229,19 @@ document.addEventListener('alpine:init', () => {
                                 </div>
                             </label>
                             
-                            <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                                <input type="radio" x-model="paymentMethod" value="manuel_admin" class="w-4 h-4 text-rose">
+                            <label class="flex items-center gap-3 p-3 border rounded-lg cursor-not-allowed opacity-50 bg-gray-100">
+                                <input type="radio" x-model="paymentMethod" value="manuel_admin" class="w-4 h-4 text-rose" disabled>
                                 <div>
-                                    <span class="font-semibold">Paiement Manuel (Admin)</span>
-                                    <p class="text-sm text-gray-500">Validation par l'administrateur après dépôt</p>
+                                    <span class="font-semibold text-gray-400">Paiement Manuel (Admin)</span>
+                                    <p class="text-sm text-gray-400">Validation par l'administrateur après dépôt (temporairement indisponible)</p>
                                 </div>
                             </label>
                             
-                            <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                                <input type="radio" x-model="paymentMethod" value="carte_bancaire" class="w-4 h-4 text-rose">
+                            <label class="flex items-center gap-3 p-3 border rounded-lg cursor-not-allowed opacity-50 bg-gray-100">
+                                <input type="radio" x-model="paymentMethod" value="carte_bancaire" class="w-4 h-4 text-rose" disabled>
                                 <div>
-                                    <span class="font-semibold">Carte Bancaire</span>
-                                    <p class="text-sm text-gray-500">Visa, Mastercard</p>
+                                    <span class="font-semibold text-gray-400">Carte Bancaire</span>
+                                    <p class="text-sm text-gray-400">Visa, Mastercard (temporairement indisponible)</p>
                                 </div>
                             </label>
                         </div>

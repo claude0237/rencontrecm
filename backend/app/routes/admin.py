@@ -709,6 +709,7 @@ def create_ad_pack():
         description=data.get('description'),
         prix=data['prix'],
         duree_jours=data['duree_jours'],
+        nombre_photos_max=data.get('nombre_photos_max', 1),
         actif=data.get('actif', True)
     )
     
@@ -732,6 +733,8 @@ def update_ad_pack(pack_id):
         pack.prix = data['prix']
     if 'duree_jours' in data:
         pack.duree_jours = data['duree_jours']
+    if 'nombre_photos_max' in data:
+        pack.nombre_photos_max = data['nombre_photos_max']
     if 'actif' in data:
         pack.actif = data['actif']
     

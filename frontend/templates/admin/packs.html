@@ -9,6 +9,7 @@
         description: '',
         prix: '',
         duree_jours: '',
+        nombre_photos_max: 1,
         actif: true
     },
     init() {
@@ -34,6 +35,7 @@
             description: '',
             prix: '',
             duree_jours: '',
+            nombre_photos_max: 1,
             actif: true
         };
     },
@@ -157,6 +159,8 @@
                             <span x-text="pack.prix + ' FCFA'"></span>
                             <span class="font-semibold">Durée:</span>
                             <span x-text="pack.duree_jours + ' jours'"></span>
+                            <span class="font-semibold">Photos max:</span>
+                            <span x-text="pack.nombre_photos_max"></span>
                         </div>
                     </div>
                     <div class="flex gap-2">
@@ -191,6 +195,11 @@
                     <input type="number" x-model="newPack.duree_jours" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
                 </div>
                 <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Nombre max de photos *</label>
+                    <input type="number" x-model="newPack.nombre_photos_max" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                    <p class="text-xs text-gray-500 mt-1">Nombre maximum de photos par annonce</p>
+                </div>
+                <div>
                     <label class="flex items-center gap-2">
                         <input type="checkbox" x-model="newPack.actif" class="rounded">
                         <span class="text-sm text-charcoal">Actif</span>
@@ -205,7 +214,7 @@
     </div>
     
     <!-- Edit Modal -->
-    <div x-show="showEditModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
+    <div x-show="showEditModal && editingPack" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" x-cloak>
         <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 class="text-xl font-bold text-charcoal mb-4">Modifier le pack</h3>
             <div class="space-y-4">
@@ -224,6 +233,11 @@
                 <div>
                     <label class="block text-sm font-semibold text-charcoal mb-2">Durée (jours) *</label>
                     <input type="number" x-model="editingPack.duree_jours" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-charcoal mb-2">Nombre max de photos *</label>
+                    <input type="number" x-model="editingPack.nombre_photos_max" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-rose">
+                    <p class="text-xs text-gray-500 mt-1">Nombre maximum de photos par annonce</p>
                 </div>
                 <div>
                     <label class="flex items-center gap-2">
